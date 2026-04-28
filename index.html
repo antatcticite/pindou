@@ -654,6 +654,20 @@ input[type=color]{width:34px;height:34px;padding:2px;border:1px solid var(--bord
           </div>
         </div>
 
+        <div class="card">
+          <div class="card-header"><div class="card-title">🔧 历史数据初始化</div></div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+            <p style="font-size:13px;color:var(--muted);line-height:1.6">
+              将 221 色套装各色库存重置为初始值（各色 1000 颗，H1=5000、H2=10000、H7=20000），然后自动扣除所有已完成图纸的用量。<br>
+              适用于首次使用前补录历史完成记录的场景。
+            </p>
+            <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:10px 12px;font-size:12px;color:#92400e;line-height:1.5">
+              ⚠️ <strong>此操作会覆盖 221 色套装的当前库存</strong>，执行前请确认或先导出备份。
+            </div>
+            <button class="btn btn-outline" onclick="runHistoricalMigration()" style="align-self:flex-start">🔧 执行历史数据初始化</button>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -814,50 +828,83 @@ input[type=color]{width:34px;height:34px;padding:2px;border:1px solid var(--bord
   </div>
 </div>
 
-<!-- Anthropic Claude AI Settings -->
-<div class="overlay" id="modalAnthropicAI">
+
+
+<!-- 阿里云百炼 AI Settings -->
+<div class="overlay" id="modalBailianAI">
   <div class="modal" style="width:440px">
     <div class="modal-header">
-      <span class="modal-title">🤖 Claude AI 识别配置</span>
-      <button class="modal-close" onclick="closeModal('modalAnthropicAI')">×</button>
+      <span class="modal-title">🧠 阿里云百炼 AI 配置</span>
+      <button class="modal-close" onclick="closeModal('modalBailianAI')">×</button>
     </div>
     <div class="modal-body">
       <div class="form-group">
         <label class="form-label">API Key</label>
-        <input class="form-control" id="anthropicKeyInput" placeholder="sk-..." type="password" autocomplete="off">
-        <div style="font-size:11px;color:var(--muted);margin-top:4px">Key 仅保存在本地浏览器，不会上传。</div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">API 地址 <span style="font-size:11px;color:var(--muted);font-weight:400">（使用代理时填写，否则留空）</span></label>
-        <input class="form-control" id="anthropicBaseUrl" placeholder="https://api.anthropic.com" autocomplete="off">
-        <div style="font-size:11px;color:var(--muted);margin-top:4px">使用朋友代理的话，填朋友给你的地址；直连官方留空即可。</div>
+        <input class="form-control" id="bailianKeyInput" placeholder="sk-..." type="password" autocomplete="off">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">
+          Key 仅保存在本地浏览器。免费申请：<a href="https://bailian.console.aliyun.com/" target="_blank" style="color:var(--primary)">bailian.console.aliyun.com</a>（无需梯子）
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label">识别模型</label>
-        <select class="form-control" id="anthropicModelPreset" onchange="this.value&&(document.getElementById('anthropicModelInput').value=this.value)">
+        <select class="form-control" id="bailianModelPreset" onchange="this.value&&(document.getElementById('bailianModelInput').value=this.value)">
           <option value="">── 常用模型（点击填入）──</option>
-          <optgroup label="Claude 4（最新）">
-            <option value="claude-haiku-4-5-20251001">claude-haiku-4-5-20251001</option>
-            <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
-          </optgroup>
-          <optgroup label="Claude 3.7 / 3.5（代理常见）">
-            <option value="claude-3-7-sonnet-20250219">claude-3-7-sonnet-20250219</option>
-            <option value="claude-3-5-haiku-20241022">claude-3-5-haiku-20241022</option>
-            <option value="claude-3-5-sonnet-20241022">claude-3-5-sonnet-20241022</option>
-          </optgroup>
+          <option value="qwen-vl-max">qwen-vl-max（最强，推荐）</option>
+          <option value="qwen-vl-max-latest">qwen-vl-max-latest（最新版）</option>
+          <option value="qwen-vl-plus">qwen-vl-plus（均衡，免费额度多）</option>
+          <option value="qwen-vl-turbo">qwen-vl-turbo（快速）</option>
         </select>
-        <input class="form-control" id="anthropicModelInput" placeholder="直接输入模型名，或从上方选择" style="margin-top:6px" autocomplete="off">
-        <div style="font-size:11px;color:var(--muted);margin-top:4px">若代理报"模型不存在"，尝试换一个模型名。验证时会显示实际使用的模型。</div>
+        <input class="form-control" id="bailianModelInput" value="qwen-vl-max" style="margin-top:6px" autocomplete="off">
       </div>
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;font-size:12px;color:#166534">
-        启用后，扫描识别将分两步：先像素匹配彩色格子，再用 Claude 视觉逐条带精准读取色号文字，最后合并结果。
+      <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px;font-size:12px;color:#9a3412">
+        新用户每个模型赠送免费 Token，无需梯子，国内直连。<br>
+        qwen-vl-max 识字与颜色理解能力最强，适合拼豆色号识别。
       </div>
-      <div id="anthropicTestResult" style="font-size:12px;margin-top:10px;min-height:18px"></div>
+      <div id="bailianTestResult" style="font-size:12px;margin-top:10px;min-height:18px"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-outline" onclick="testAnthropicConfig()">验证 API Key</button>
-      <button class="btn btn-outline" onclick="closeModal('modalAnthropicAI')">取消</button>
-      <button class="btn btn-primary" onclick="saveAnthropicSettings()">保存</button>
+      <button class="btn btn-outline" onclick="testBailianConfig()">验证 API Key</button>
+      <button class="btn btn-outline" onclick="closeModal('modalBailianAI')">取消</button>
+      <button class="btn btn-primary" onclick="saveBailianSettings()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Google Gemini AI Settings -->
+<div class="overlay" id="modalGeminiAI">
+  <div class="modal" style="width:440px">
+    <div class="modal-header">
+      <span class="modal-title">✨ Gemini AI 识别配置</span>
+      <button class="modal-close" onclick="closeModal('modalGeminiAI')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">API Key</label>
+        <input class="form-control" id="geminiKeyInput" placeholder="AIza..." type="password" autocomplete="off">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">
+          Key 仅保存在本地浏览器，不会上传。免费申请：<a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--primary)">aistudio.google.com</a>（需梯子）
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">识别模型</label>
+        <select class="form-control" id="geminiModelPreset" onchange="this.value&&(document.getElementById('geminiModelInput').value=this.value)">
+          <option value="">── 常用模型（点击填入）──</option>
+          <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite（推荐，免费）</option>
+          <option value="gemini-2.0-flash">gemini-2.0-flash（部分地区免费）</option>
+          <option value="gemini-1.5-flash">gemini-1.5-flash（旧版）</option>
+          <option value="gemini-2.5-flash-preview-04-17">gemini-2.5-flash-preview（最新）</option>
+        </select>
+        <input class="form-control" id="geminiModelInput" value="gemini-2.0-flash-lite" style="margin-top:6px" autocomplete="off">
+      </div>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;font-size:12px;color:#166534">
+        Google Gemini 免费套餐：每天 1500 次请求，每分钟 15 次，支持图片识别，完全够用。<br>
+      </div>
+      <div id="geminiTestResult" style="font-size:12px;margin-top:10px;min-height:18px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="testGeminiConfig()">验证 API Key</button>
+      <button class="btn btn-outline" onclick="closeModal('modalGeminiAI')">取消</button>
+      <button class="btn btn-primary" onclick="saveGeminiSettings()">保存</button>
     </div>
   </div>
 </div>
@@ -1113,7 +1160,8 @@ input[type=color]{width:34px;height:34px;padding:2px;border:1px solid var(--bord
           <span class="text-sm text-muted">行：</span>
           <input id="hlRows" type="number" min="1" value="40" class="form-control" style="width:65px" oninput="drawHlCanvas()">
           <button class="btn btn-sm btn-primary" onclick="doHighlightScan()">🔍 扫描识别</button>
-          <button class="btn btn-xs btn-outline" onclick="openAnthropicSettings()" title="配置 Claude AI 精准识别">🤖 Claude AI</button>
+          <button class="btn btn-xs btn-outline" id="bailianAiBtn" onclick="openBailianSettings()" title="配置阿里云百炼 AI（无需梯子）">🧠 百炼 AI</button>
+          <button class="btn btn-xs btn-outline" id="geminiAiBtn" onclick="openGeminiSettings()" title="配置 Gemini AI 精准识别（免费）">✨ Gemini AI</button>
           <span id="hlScopeChip" style="display:none;font-size:11px;padding:2px 8px;border-radius:10px;background:#fef3c7;color:#92400e;border:1px solid #fbbf24;white-space:nowrap"></span>
           <button class="btn btn-xs btn-outline" onclick="resetHlGrid()">重置网格</button>
           <button class="btn btn-xs btn-outline" id="hlSaveBtn" onclick="saveHlScan()" style="display:none">💾 保存结果</button>
@@ -2310,10 +2358,23 @@ function startEditDrawingName(id) {
 }
 
 function updateDrawingStatus(id, status) {
-  DB.updateDrawing(id, { status });
+  const d = DB.getDrawing(id);
+  const wasCompleted = d && d.status === 'completed';
+  if (status === 'completed' && !wasCompleted) {
+    const reqs = (d && d.colorRequirements) || [];
+    for (const r of reqs) {
+      const c = DB.getColor(r.colorId);
+      if (!c) continue;
+      DB.updateColor(r.colorId, { stock: Math.max(0, c.stock - r.count) });
+    }
+    DB.updateDrawing(id, { status, completedAt: Date.now() });
+    toast('状态已更新，库存已自动扣除', 'success');
+  } else {
+    DB.updateDrawing(id, { status });
+    toast('状态已更新', 'success');
+  }
   renderDrawingDetail(id);
   renderDashboard();
-  toast('状态已更新', 'success');
 }
 
 function deleteDrawing(id) {
@@ -2667,45 +2728,48 @@ function saveBaiduOCRSettings() {
   updateOCREngineLabel();
 }
 // ══════════════════════════════════════════
-//  ANTHROPIC CLAUDE AI
+//  阿里云百炼 AI (OpenAI-compatible)
 // ══════════════════════════════════════════
-const ANTHROPIC_STORAGE_KEY = 'anthropic_ai_config';
-function getAnthropicConfig() {
-  try { return JSON.parse(localStorage.getItem(ANTHROPIC_STORAGE_KEY) || '{}'); } catch(e) { return {}; }
+const BAILIAN_STORAGE_KEY = 'pdgj_bailian_cfg';
+const BAILIAN_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+function getBailianConfig() {
+  try { return JSON.parse(localStorage.getItem(BAILIAN_STORAGE_KEY) || '{}'); } catch(e) { return {}; }
 }
-function hasAnthropicConfig() { return !!getAnthropicConfig().apiKey; }
-function openAnthropicSettings() {
-  const c = getAnthropicConfig();
-  document.getElementById('anthropicKeyInput').value   = c.apiKey || '';
-  document.getElementById('anthropicBaseUrl').value    = c.baseUrl || '';
-  document.getElementById('anthropicModelInput').value = c.model || 'claude-3-5-haiku-20241022';
-  openModal('modalAnthropicAI');
+function hasBailianConfig() { return !!getBailianConfig().apiKey; }
+function openBailianSettings() {
+  const c = getBailianConfig();
+  document.getElementById('bailianKeyInput').value   = c.apiKey || '';
+  document.getElementById('bailianModelInput').value = c.model  || 'qwen-vl-max';
+  openModal('modalBailianAI');
 }
-function saveAnthropicSettings() {
-  const apiKey  = document.getElementById('anthropicKeyInput').value.trim();
-  const baseUrl = document.getElementById('anthropicBaseUrl').value.trim().replace(/\/$/, '');
-  const model   = document.getElementById('anthropicModelInput').value.trim() || 'claude-3-5-haiku-20241022';
+function saveBailianSettings() {
+  const apiKey = document.getElementById('bailianKeyInput').value.trim();
+  const model  = document.getElementById('bailianModelInput').value.trim() || 'qwen-vl-max';
   if (!apiKey) { toast('请填写 API Key', 'warn'); return; }
-  localStorage.setItem(ANTHROPIC_STORAGE_KEY, JSON.stringify({ apiKey, baseUrl, model }));
-  toast('Claude AI 配置已保存', 'success');
-  closeModal('modalAnthropicAI');
+  localStorage.setItem(BAILIAN_STORAGE_KEY, JSON.stringify({ apiKey, model }));
+  toast('百炼 AI 配置已保存', 'success');
+  closeModal('modalBailianAI');
+  _updateBailianBtn();
 }
-async function testAnthropicConfig() {
-  const el = document.getElementById('anthropicTestResult');
-  const apiKey  = document.getElementById('anthropicKeyInput').value.trim();
-  const baseUrl = (document.getElementById('anthropicBaseUrl').value.trim().replace(/\/$/, '')) || 'https://api.anthropic.com';
-  const model   = document.getElementById('anthropicModelInput').value.trim() || 'claude-3-5-haiku-20241022';
+function _updateBailianBtn() {
+  const btn = document.getElementById('bailianAiBtn');
+  if (!btn) return;
+  if (hasBailianConfig()) {
+    btn.style.background = '#ffedd5'; btn.style.borderColor = '#ea580c'; btn.style.color = '#9a3412';
+  } else {
+    btn.style.background = ''; btn.style.borderColor = ''; btn.style.color = '';
+  }
+}
+async function testBailianConfig() {
+  const el = document.getElementById('bailianTestResult');
+  const apiKey = document.getElementById('bailianKeyInput').value.trim();
+  const model  = document.getElementById('bailianModelInput').value.trim() || 'qwen-vl-max';
   if (!apiKey) { el.innerHTML = '<span style="color:var(--danger)">请先填写 API Key</span>'; return; }
   el.innerHTML = '<span style="color:var(--muted)">验证中…</span>';
   try {
-    const res = await fetch(`${baseUrl}/v1/messages`, {
+    const res = await fetch(`${BAILIAN_BASE_URL}/chat/completions`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
       body: JSON.stringify({
         model,
         max_tokens: 16,
@@ -2713,66 +2777,224 @@ async function testAnthropicConfig() {
       })
     });
     const data = await res.json();
-    const replyText = data.content?.[0]?.text || '';
-    const errMsg    = data.error?.message || '';
-    if (res.ok && replyText && !errMsg) {
+    if (!res.ok) {
+      el.innerHTML = `<span style="color:var(--danger)">✗ ${data.error?.message || `HTTP ${res.status}`}</span>`; return;
+    }
+    const text = data.choices?.[0]?.message?.content || '';
+    if (text) {
       el.innerHTML = `<span style="color:var(--success)">✓ 连接成功，模型 <b>${model}</b> 可用</span>`;
-    } else if (errMsg) {
-      el.innerHTML = `<span style="color:var(--danger)">✗ API 错误：${errMsg}</span>`;
-    } else if (replyText) {
-      // 代理返回了内容但可能是错误提示
-      el.innerHTML = `<span style="color:var(--warning)">⚠ 代理响应异常（模型名可能有误）：${replyText.slice(0, 80)}</span>`;
     } else {
-      el.innerHTML = `<span style="color:var(--danger)">✗ HTTP ${res.status}，请检查 API Key 或地址</span>`;
+      el.innerHTML = `<span style="color:var(--danger)">✗ 返回为空，请检查模型名</span>`;
     }
   } catch(e) {
     el.innerHTML = `<span style="color:var(--danger)">✗ 网络错误：${e.message}</span>`;
   }
 }
-async function _callClaudeVision(canvas, rowStart, rowCount, cols) {
-  const cfg = getAnthropicConfig();
+async function _callBailianVision(canvas, rowStart, rowCount, cols, colorPalette, draftMap) {
+  const cfg = getBailianConfig();
   if (!cfg.apiKey) return null;
-  const model   = cfg.model || 'claude-haiku-4-5-20251001';
-  const baseUrl = (cfg.baseUrl || 'https://api.anthropic.com').replace(/\/$/, '');
-  const base64  = canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
+  const model  = cfg.model || 'qwen-vl-max';
+  const base64 = canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
+
+  const paletteStr = colorPalette.map(c => {
+    const {r,g,b} = hexToRgb(c.hex);
+    return `${c.code}(${r},${g},${b})`;
+  }).join('  ');
+
+  const draftLines = [];
+  for (let r = rowStart; r < rowStart + rowCount; r++) {
+    const row = draftMap[r];
+    if (!row) continue;
+    const cells = row.map((code, c) => code ? `${c}:${code}` : null).filter(Boolean);
+    if (cells.length) draftLines.push(`行${r}: ${cells.join(' ')}`);
+  }
+  const draftStr = draftLines.length ? draftLines.join('\n') : '（像素匹配无结果）';
+
+  const prompt =
+    `这是拼豆图纸第 ${rowStart}～${rowStart + rowCount - 1} 行（${rowCount} 行×${cols} 列）的条带图片。\n\n` +
+    `【可用色号表（共 ${colorPalette.length} 种，格式：色号(R,G,B)）】\n${paletteStr}\n\n` +
+    `【像素颜色初稿，供参考可纠正】\n${draftStr}\n\n` +
+    `请综合以下三个维度判断每个有颜色格子的色号：\n` +
+    `① 视觉颜色——格子的实际颜色与色号表 RGB 的接近程度\n` +
+    `② 印刷文字——格子内印的色号文字（浅色格看黑色小字，深色格看白色小字）\n` +
+    `③ 图案连贯——相邻格子的颜色关系与整体图案形状\n\n` +
+    `规则：色号必须来自上方色号表；完全空白格跳过；行号从 ${rowStart} 开始，列号从 0 开始。\n` +
+    `只输出 JSON 数组：[[行号, 列号, "色号"], ...]，不含任何解释。`;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 90000); // 90秒超时
   try {
-    const res = await fetch(`${baseUrl}/v1/messages`, {
+    const res = await fetch(`${BAILIAN_BASE_URL}/chat/completions`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': cfg.apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
+      signal: controller.signal,
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
       body: JSON.stringify({
         model,
-        max_tokens: 4096,
+        max_tokens: 8192,
         messages: [{
           role: 'user',
           content: [
-            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
-            { type: 'text', text:
-              `这是拼豆图纸第 ${rowStart} 到第 ${rowStart + rowCount - 1} 行（共 ${rowCount} 行 ${cols} 列）的条带图片，红线为网格线。\n` +
-              `规则：\n` +
-              `• 每个放了珠子的格子内都印有色号（字母+数字，如 E10、B41、H1、H2、W01、B41），字体较小\n` +
-              `• 白色/浅色格子内也可能有色号（如 H2、H1、W01），请仔细辨认浅色背景上的黑色小字\n` +
-              `• 深色/黑色格子内也可能有白色色号文字（如 B41、N1）\n` +
-              `• 完全空白、无任何文字的格子才是空格，直接跳过\n` +
-              `请识别所有有色号的格子，只输出 JSON 数组，格式为 [[行号, 列号, "色号"], ...]，` +
-              `行号从 ${rowStart} 开始，列号从 0 开始。只输出 JSON，不要任何解释。`
-            }
+            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } },
+            { type: 'text', text: prompt }
           ]
         }]
       })
     });
-    if (!res.ok) { console.warn('Claude API', res.status, await res.text()); return null; }
+    clearTimeout(timeout);
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.warn('百炼 API error', res.status, errBody);
+      return null;
+    }
     const data = await res.json();
-    const text = (data.content?.[0]?.text || '').trim();
+    const text = (data.choices?.[0]?.message?.content || '').trim();
     const m = text.match(/\[[\s\S]*\]/);
-    if (!m) return null;
+    if (!m) { console.warn('百炼 Vision: no JSON in response', text.slice(0, 200)); return null; }
     return JSON.parse(m[0]);
-  } catch(e) { console.warn('Claude vision error', e); return null; }
+  } catch(e) {
+    clearTimeout(timeout);
+    if (e.name === 'AbortError') console.warn('百炼 Vision: 请求超时（90s）');
+    else console.warn('百炼 Vision fetch error', e);
+    return null;
+  }
 }
+
+// ══════════════════════════════════════════
+//  GOOGLE GEMINI AI
+// ══════════════════════════════════════════
+const GEMINI_STORAGE_KEY = 'pdgj_gemini_cfg';
+function getGeminiConfig() {
+  try { return JSON.parse(localStorage.getItem(GEMINI_STORAGE_KEY) || '{}'); } catch(e) { return {}; }
+}
+function hasGeminiConfig() { return !!getGeminiConfig().apiKey; }
+function openGeminiSettings() {
+  const c = getGeminiConfig();
+  document.getElementById('geminiKeyInput').value   = c.apiKey || '';
+  document.getElementById('geminiModelInput').value = c.model  || 'gemini-2.0-flash';
+  openModal('modalGeminiAI');
+}
+function saveGeminiSettings() {
+  const apiKey = document.getElementById('geminiKeyInput').value.trim();
+  const model  = document.getElementById('geminiModelInput').value.trim() || 'gemini-2.0-flash';
+  if (!apiKey) { toast('请填写 API Key', 'warn'); return; }
+  localStorage.setItem(GEMINI_STORAGE_KEY, JSON.stringify({ apiKey, model }));
+  toast('Gemini AI 配置已保存', 'success');
+  closeModal('modalGeminiAI');
+  _updateGeminiBtn();
+}
+function _updateGeminiBtn() {
+  const btn = document.getElementById('geminiAiBtn');
+  if (!btn) return;
+  if (hasGeminiConfig()) {
+    btn.style.background = '#bbf7d0'; btn.style.borderColor = '#16a34a'; btn.style.color = '#15803d';
+  } else {
+    btn.style.background = ''; btn.style.borderColor = ''; btn.style.color = '';
+  }
+}
+async function testGeminiConfig() {
+  const el = document.getElementById('geminiTestResult');
+  const apiKey = document.getElementById('geminiKeyInput').value.trim();
+  const model  = document.getElementById('geminiModelInput').value.trim() || 'gemini-2.0-flash';
+  if (!apiKey) { el.innerHTML = '<span style="color:var(--danger)">请先填写 API Key</span>'; return; }
+  el.innerHTML = '<span style="color:var(--muted)">验证中…</span>';
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: '回复数字1' }] }],
+          generationConfig: { maxOutputTokens: 16 } })
+      }
+    );
+    const data = await res.json();
+    if (!res.ok) {
+      const msg = data.error?.message || `HTTP ${res.status}`;
+      el.innerHTML = `<span style="color:var(--danger)">✗ ${msg}</span>`; return;
+    }
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if (text) {
+      el.innerHTML = `<span style="color:var(--success)">✓ 连接成功，模型 <b>${model}</b> 可用</span>`;
+    } else {
+      el.innerHTML = `<span style="color:var(--danger)">✗ 返回为空，请检查模型名</span>`;
+    }
+  } catch(e) {
+    el.innerHTML = `<span style="color:var(--danger)">✗ 网络错误：${e.message}</span>`;
+  }
+}
+async function _callGeminiVision(canvas, rowStart, rowCount, cols, colorPalette, draftMap) {
+  const cfg = getGeminiConfig();
+  if (!cfg.apiKey) return null;
+  const model  = cfg.model || 'gemini-2.0-flash';
+  const base64 = canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
+
+  // 色号表：每种颜色的码 + RGB，让 AI 知道每种颜色长什么样
+  const paletteStr = colorPalette.map(c => {
+    const {r,g,b} = hexToRgb(c.hex);
+    return `${c.code}(${r},${g},${b})`;
+  }).join('  ');
+
+  // Phase 1 初稿：告知 AI 像素匹配的结果，让它验证或纠正
+  const draftLines = [];
+  for (let r = rowStart; r < rowStart + rowCount; r++) {
+    const row = draftMap[r];
+    if (!row) continue;
+    const cells = row.map((code, c) => code ? `${c}:${code}` : null).filter(Boolean);
+    if (cells.length) draftLines.push(`行${r}: ${cells.join(' ')}`);
+  }
+  const draftStr = draftLines.length ? draftLines.join('\n') : '（像素匹配无结果）';
+
+  const prompt =
+    `这是拼豆图纸第 ${rowStart}～${rowStart + rowCount - 1} 行（${rowCount} 行×${cols} 列）的条带图片。\n\n` +
+    `【可用色号表（共 ${colorPalette.length} 种，格式：色号(R,G,B)）】\n${paletteStr}\n\n` +
+    `【像素颜色初稿，供参考可纠正】\n${draftStr}\n\n` +
+    `请综合以下三个维度判断每个有颜色的格子的色号：\n` +
+    `① 视觉颜色——格子的实际颜色与色号表中 RGB 的接近程度\n` +
+    `② 印刷文字——格子内印的色号文字（浅色格看黑色小字，深色格看白色小字）\n` +
+    `③ 图案连贯——相邻格子的颜色关系与整体图案形状\n\n` +
+    `规则：\n` +
+    `• 色号必须来自上方色号表，不得输出表外色号\n` +
+    `• 完全空白无文字的格子直接跳过\n` +
+    `• 行号从 ${rowStart} 开始，列号从 0 开始\n\n` +
+    `只输出 JSON 数组：[[行号, 列号, "色号"], ...]，不含任何解释。`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 90000);
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cfg.apiKey}`,
+      {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [
+            { inline_data: { mime_type: 'image/jpeg', data: base64 } },
+            { text: prompt }
+          ]}],
+          generationConfig: { maxOutputTokens: 8192 }
+        })
+      }
+    );
+    clearTimeout(timeout);
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.warn('Gemini API error', res.status, errBody);
+      return null;
+    }
+    const data = await res.json();
+    const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
+    const m = text.match(/\[[\s\S]*\]/);
+    if (!m) { console.warn('Gemini Vision: no JSON in response', text.slice(0, 200)); return null; }
+    return JSON.parse(m[0]);
+  } catch(e) {
+    clearTimeout(timeout);
+    if (e.name === 'AbortError') console.warn('Gemini Vision: 请求超时（90s）');
+    else console.warn('Gemini Vision fetch error', e);
+    return null;
+  }
+}
+
+
 
 async function testBaiduOCR() {
   const el = document.getElementById('baiduTestResult');
@@ -3823,15 +4045,20 @@ async function doHighlightScan() {
     }
   }
 
-  // ── 阶段 2：Claude Vision 精准识别（可选，需配置 API Key） ──────────────
-  if (hasAnthropicConfig()) {
+  // ── 阶段 2：AI 精准识别（Gemini 优先，其次 Claude，均需配置 API Key） ──────
+  const _aiVisionFn = hasBailianConfig() ? _callBailianVision
+                    : hasGeminiConfig()  ? _callGeminiVision
+                    : null;
+  const _aiLabel = hasBailianConfig() ? '百炼 AI' : 'Gemini AI';
+  if (_aiVisionFn) {
     const CLAUDE_STRIP_ROWS = 15; // 每条带行数，过大会降低识别精度
     const MAX_CLAUDE_DIM = 3000;  // 上传前最大边长（像素）
     const totalCS = Math.ceil(rows / CLAUDE_STRIP_ROWS);
+    let claudeUpdated = 0, claudeErrors = 0;
     for (let s = 0; s < totalCS; s++) {
       const rowStart = s * CLAUDE_STRIP_ROWS;
       const stripRowCount = Math.min(CLAUDE_STRIP_ROWS, rows - rowStart);
-      hintEl.textContent = `Claude AI 识别… 第 ${s + 1}/${totalCS} 条`;
+      hintEl.textContent = `${_aiLabel} 识别… 第 ${s + 1}/${totalCS} 条`;
       await new Promise(r => setTimeout(r, 0)); // yield UI
 
       // 从原图裁切对应条带
@@ -3856,16 +4083,17 @@ async function doHighlightScan() {
         uc.drawImage(stripOff, 0, 0, claudeCanvas.width, claudeCanvas.height);
       }
 
-      const results = await _callClaudeVision(claudeCanvas, rowStart, stripRowCount, cols);
-      if (!Array.isArray(results)) continue;
+      const results = await _aiVisionFn(claudeCanvas, rowStart, stripRowCount, cols, allColors, hlColorMap);
+      if (!Array.isArray(results)) { claudeErrors++; continue; }
       for (const item of results) {
         if (!Array.isArray(item) || item.length < 3) continue;
         const [r, c, rawCode] = item;
         if (typeof r !== 'number' || typeof c !== 'number') continue;
         if (r < 0 || r >= rows || c < 0 || c >= cols) continue;
         const codeUp = String(rawCode).toUpperCase().replace(/\s/g, '');
-        // 精确匹配 → 直接写入；否则尝试 Levenshtein-1 容错
+        // 精确匹配 → 可填空格或覆盖旧值；模糊匹配 → 仅填空格，不覆盖像素已识别的结果
         let matched = allColors.find(x => x.code.toUpperCase() === codeUp);
+        const isExact = !!matched;
         if (!matched) {
           let bestD = 2;
           for (const ac of allColors) {
@@ -3881,16 +4109,27 @@ async function doHighlightScan() {
           }
           if (bestD > 1) matched = null;
         }
-        if (matched) hlColorMap[r][c] = matched.code.toUpperCase();
+        if (matched) {
+          // AI 综合判断结果直接覆盖（AI 已参考了色号表、初稿和图案，比单纯像素匹配更可靠）
+          hlColorMap[r][c] = matched.code.toUpperCase();
+          claudeUpdated++;
+        }
       }
     }
-    // 更新中间结果显示
+    // 更新中间结果显示，并给出反馈
     const cmC = {};
     hlColorMap.forEach(rr => rr.forEach(cc => { if (cc) cmC[cc] = (cmC[cc]||0)+1; }));
     hlDetected = Object.entries(cmC)
       .map(([code, count]) => ({ code, count, color: allColors.find(c => c.code.toUpperCase() === code.toUpperCase()) }))
       .sort((a, b) => b.count - a.count);
     renderHlPalette(); drawHlCanvas();
+    if (claudeErrors === totalCS) {
+      toast(`${_aiLabel} 全部请求失败，请检查 API Key 和网络（按 F12 查看控制台）`, 'warn');
+    } else if (claudeErrors > 0) {
+      toast(`${_aiLabel} 完成（${claudeUpdated} 格），${claudeErrors} 条失败`, 'warn');
+    } else {
+      toast(`${_aiLabel} 完成，更新了 ${claudeUpdated} 个格子`, 'success');
+    }
   }
 
   // ── 阶段 3：范围过滤——仅在行/列存在彩色锚点时，清除锚点跨度外的孤立无色相误判 ──
@@ -4316,6 +4555,46 @@ async function pullFromCloud() {
     toast('拉取失败：' + e.message, 'warn');
   } finally {
     btn.disabled = false; btn.textContent = '⬇️ 从云端拉取';
+  }
+}
+
+function runHistoricalMigration() {
+  if (!confirm('此操作将：\n1. 将 221 色套装各色库存重置为 1000（H1=5000，H2=10000，H7=20000）\n2. 扣除所有已完成图纸的色号用量\n\n确认执行？（此操作不可撤销，建议先导出备份）')) return;
+
+  const set221 = new Set(['A','B','C','D','E','F','G','H','M']);
+  const special = { 'H1': 5000, 'H2': 10000, 'H7': 20000 };
+
+  const colors = DB.getColors();
+  let resetCount = 0;
+  for (const c of colors) {
+    const series = c.code.replace(/[^A-Za-z]/g, '').toUpperCase();
+    if (!set221.has(series)) continue;
+    const initStock = special[c.code.toUpperCase()] !== undefined ? special[c.code.toUpperCase()] : 1000;
+    DB.updateColor(c.id, { stock: initStock });
+    resetCount++;
+  }
+
+  const completed = DB.getDrawings().filter(d => d.status === 'completed');
+  let deductOk = 0, deductSkip = 0;
+  for (const d of completed) {
+    for (const r of (d.colorRequirements || [])) {
+      const c = DB.getColor(r.colorId);
+      if (!c) {
+        deductSkip++;
+        console.warn(`[迁移] 跳过：图纸「${d.name}」中 colorId=${r.colorId} count=${r.count}，在色号库中未找到对应色号`);
+        continue;
+      }
+      console.log(`[迁移] 扣除：${c.code} ${c.stock} - ${r.count} → ${Math.max(0, c.stock - r.count)}（图纸：${d.name}）`);
+      DB.updateColor(r.colorId, { stock: Math.max(0, c.stock - r.count) });
+      deductOk++;
+    }
+  }
+
+  renderDashboard();
+  if (deductSkip > 0) {
+    toast(`初始化完成，但有 ${deductSkip} 条需求因色号ID失效被跳过（请打开浏览器控制台查看详情）`, 'warn');
+  } else {
+    toast(`初始化完成：重置 ${resetCount} 个色号，处理 ${completed.length} 张图纸，扣除 ${deductOk} 条需求`, 'success');
   }
 }
 
@@ -5387,6 +5666,8 @@ if (!localStorage.getItem(BAIDU_STORAGE_KEY)) {
   }));
 }
 updateOCREngineLabel();
+_updateBailianBtn();
+_updateGeminiBtn();
 initDefaultColors();
 document.getElementById('page-colors').classList.add('active');
 renderColorsGrid();
