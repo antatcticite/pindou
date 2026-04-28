@@ -870,45 +870,6 @@ input[type=color]{width:34px;height:34px;padding:2px;border:1px solid var(--bord
   </div>
 </div>
 
-<!-- Google Gemini AI Settings -->
-<div class="overlay" id="modalGeminiAI">
-  <div class="modal" style="width:440px">
-    <div class="modal-header">
-      <span class="modal-title">✨ Gemini AI 识别配置</span>
-      <button class="modal-close" onclick="closeModal('modalGeminiAI')">×</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">API Key</label>
-        <input class="form-control" id="geminiKeyInput" placeholder="AIza..." type="password" autocomplete="off">
-        <div style="font-size:11px;color:var(--muted);margin-top:4px">
-          Key 仅保存在本地浏览器，不会上传。免费申请：<a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--primary)">aistudio.google.com</a>（需梯子）
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">识别模型</label>
-        <select class="form-control" id="geminiModelPreset" onchange="this.value&&(document.getElementById('geminiModelInput').value=this.value)">
-          <option value="">── 常用模型（点击填入）──</option>
-          <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite（推荐，免费）</option>
-          <option value="gemini-2.0-flash">gemini-2.0-flash（部分地区免费）</option>
-          <option value="gemini-1.5-flash">gemini-1.5-flash（旧版）</option>
-          <option value="gemini-2.5-flash-preview-04-17">gemini-2.5-flash-preview（最新）</option>
-        </select>
-        <input class="form-control" id="geminiModelInput" value="gemini-2.0-flash-lite" style="margin-top:6px" autocomplete="off">
-      </div>
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;font-size:12px;color:#166534">
-        Google Gemini 免费套餐：每天 1500 次请求，每分钟 15 次，支持图片识别，完全够用。<br>
-      </div>
-      <div id="geminiTestResult" style="font-size:12px;margin-top:10px;min-height:18px"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="testGeminiConfig()">验证 API Key</button>
-      <button class="btn btn-outline" onclick="closeModal('modalGeminiAI')">取消</button>
-      <button class="btn btn-primary" onclick="saveGeminiSettings()">保存</button>
-    </div>
-  </div>
-</div>
-
 <!-- Batch stock OUT (手动出库) -->
 <div class="overlay" id="modalBatchStock">
   <div class="modal modal-lg">
@@ -1161,7 +1122,12 @@ input[type=color]{width:34px;height:34px;padding:2px;border:1px solid var(--bord
           <input id="hlRows" type="number" min="1" value="40" class="form-control" style="width:65px" oninput="drawHlCanvas()">
           <button class="btn btn-sm btn-primary" onclick="doHighlightScan()">🔍 扫描识别</button>
           <button class="btn btn-xs btn-outline" id="bailianAiBtn" onclick="openBailianSettings()" title="配置阿里云百炼 AI（无需梯子）">🧠 百炼 AI</button>
-          <button class="btn btn-xs btn-outline" id="geminiAiBtn" onclick="openGeminiSettings()" title="配置 Gemini AI 精准识别（免费）">✨ Gemini AI</button>
+          <select id="hlEnhanceSelect" class="form-control" onchange="hlEnhanceMode=this.value" title="图像预处理：对模糊或对比度低的图纸有帮助" style="font-size:12px;padding:2px 6px;height:auto;width:auto">
+            <option value="original">原图</option>
+            <option value="contrast">对比度↑</option>
+            <option value="sharpen">锐化</option>
+            <option value="both">锐化+对比度</option>
+          </select>
           <span id="hlScopeChip" style="display:none;font-size:11px;padding:2px 8px;border-radius:10px;background:#fef3c7;color:#92400e;border:1px solid #fbbf24;white-space:nowrap"></span>
           <button class="btn btn-xs btn-outline" onclick="resetHlGrid()">重置网格</button>
           <button class="btn btn-xs btn-outline" id="hlSaveBtn" onclick="saveHlScan()" style="display:none">💾 保存结果</button>
@@ -2810,15 +2776,26 @@ async function _callBailianVision(canvas, rowStart, rowCount, cols, colorPalette
   }
   const draftStr = draftLines.length ? draftLines.join('\n') : '（像素匹配无结果）';
 
+  const hasWhiteColor = colorPalette.some(c => ['H1','H2'].includes(c.code.toUpperCase()));
+  const whiteNote = hasWhiteColor
+    ? `\n· H1/H2 是纯白/近白豆子，外观与空格极相似，唯一区别是格内印有"H1"或"H2"字样——白色格子请务必仔细寻找这两个字，找到即输出，找不到才判为空格`
+    : '';
+
   const prompt =
     `这是拼豆图纸第 ${rowStart}～${rowStart + rowCount - 1} 行（${rowCount} 行×${cols} 列）的条带图片。\n\n` +
     `【可用色号表（共 ${colorPalette.length} 种，格式：色号(R,G,B)）】\n${paletteStr}\n\n` +
-    `【像素颜色初稿，供参考可纠正】\n${draftStr}\n\n` +
-    `请综合以下三个维度判断每个有颜色格子的色号：\n` +
-    `① 视觉颜色——格子的实际颜色与色号表 RGB 的接近程度\n` +
-    `② 印刷文字——格子内印的色号文字（浅色格看黑色小字，深色格看白色小字）\n` +
-    `③ 图案连贯——相邻格子的颜色关系与整体图案形状\n\n` +
-    `规则：色号必须来自上方色号表；完全空白格跳过；行号从 ${rowStart} 开始，列号从 0 开始。\n` +
+    `【像素颜色初稿（仅供参考，文字优先于颜色）】\n${draftStr}\n\n` +
+    `【识别规则——严格按优先级执行】\n\n` +
+    `▶ 第一优先（最准确）：读取格子内印刷的色号文字\n` +
+    `  · 浅色/白色格子：找黑色细小字（如"H2""H17""A21"）\n` +
+    `  · 深色格子：找白色或浅色小字\n` +
+    `  · 认出文字即为色号，不受格子颜色影响；颜色相近的色号（如 H17 与 H22）请只看文字，不要靠颜色猜测\n\n` +
+    `▶ 第二优先：视觉颜色——文字无法辨认时，参考格子 RGB 与色号表的接近程度\n\n` +
+    `▶ 辅助：图案连贯——相邻格子关系辅助判断边界\n\n` +
+    `【特别注意】${whiteNote}\n` +
+    `· 图片可能含有水印或背景文字，请忽略图上叠加的水印，只识别格子内固有的色号印刷\n` +
+    `· 只有格内既无文字又无颜色时才判为空格；不要把白色豆子误当空格\n` +
+    `· 色号必须来自上方色号表，行号从 ${rowStart} 开始，列号从 0 开始\n\n` +
     `只输出 JSON 数组：[[行号, 列号, "色号"], ...]，不含任何解释。`;
 
   const controller = new AbortController();
@@ -2859,140 +2836,6 @@ async function _callBailianVision(canvas, rowStart, rowCount, cols, colorPalette
   }
 }
 
-// ══════════════════════════════════════════
-//  GOOGLE GEMINI AI
-// ══════════════════════════════════════════
-const GEMINI_STORAGE_KEY = 'pdgj_gemini_cfg';
-function getGeminiConfig() {
-  try { return JSON.parse(localStorage.getItem(GEMINI_STORAGE_KEY) || '{}'); } catch(e) { return {}; }
-}
-function hasGeminiConfig() { return !!getGeminiConfig().apiKey; }
-function openGeminiSettings() {
-  const c = getGeminiConfig();
-  document.getElementById('geminiKeyInput').value   = c.apiKey || '';
-  document.getElementById('geminiModelInput').value = c.model  || 'gemini-2.0-flash';
-  openModal('modalGeminiAI');
-}
-function saveGeminiSettings() {
-  const apiKey = document.getElementById('geminiKeyInput').value.trim();
-  const model  = document.getElementById('geminiModelInput').value.trim() || 'gemini-2.0-flash';
-  if (!apiKey) { toast('请填写 API Key', 'warn'); return; }
-  localStorage.setItem(GEMINI_STORAGE_KEY, JSON.stringify({ apiKey, model }));
-  toast('Gemini AI 配置已保存', 'success');
-  closeModal('modalGeminiAI');
-  _updateGeminiBtn();
-}
-function _updateGeminiBtn() {
-  const btn = document.getElementById('geminiAiBtn');
-  if (!btn) return;
-  if (hasGeminiConfig()) {
-    btn.style.background = '#bbf7d0'; btn.style.borderColor = '#16a34a'; btn.style.color = '#15803d';
-  } else {
-    btn.style.background = ''; btn.style.borderColor = ''; btn.style.color = '';
-  }
-}
-async function testGeminiConfig() {
-  const el = document.getElementById('geminiTestResult');
-  const apiKey = document.getElementById('geminiKeyInput').value.trim();
-  const model  = document.getElementById('geminiModelInput').value.trim() || 'gemini-2.0-flash';
-  if (!apiKey) { el.innerHTML = '<span style="color:var(--danger)">请先填写 API Key</span>'; return; }
-  el.innerHTML = '<span style="color:var(--muted)">验证中…</span>';
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: '回复数字1' }] }],
-          generationConfig: { maxOutputTokens: 16 } })
-      }
-    );
-    const data = await res.json();
-    if (!res.ok) {
-      const msg = data.error?.message || `HTTP ${res.status}`;
-      el.innerHTML = `<span style="color:var(--danger)">✗ ${msg}</span>`; return;
-    }
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    if (text) {
-      el.innerHTML = `<span style="color:var(--success)">✓ 连接成功，模型 <b>${model}</b> 可用</span>`;
-    } else {
-      el.innerHTML = `<span style="color:var(--danger)">✗ 返回为空，请检查模型名</span>`;
-    }
-  } catch(e) {
-    el.innerHTML = `<span style="color:var(--danger)">✗ 网络错误：${e.message}</span>`;
-  }
-}
-async function _callGeminiVision(canvas, rowStart, rowCount, cols, colorPalette, draftMap) {
-  const cfg = getGeminiConfig();
-  if (!cfg.apiKey) return null;
-  const model  = cfg.model || 'gemini-2.0-flash';
-  const base64 = canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
-
-  // 色号表：每种颜色的码 + RGB，让 AI 知道每种颜色长什么样
-  const paletteStr = colorPalette.map(c => {
-    const {r,g,b} = hexToRgb(c.hex);
-    return `${c.code}(${r},${g},${b})`;
-  }).join('  ');
-
-  // Phase 1 初稿：告知 AI 像素匹配的结果，让它验证或纠正
-  const draftLines = [];
-  for (let r = rowStart; r < rowStart + rowCount; r++) {
-    const row = draftMap[r];
-    if (!row) continue;
-    const cells = row.map((code, c) => code ? `${c}:${code}` : null).filter(Boolean);
-    if (cells.length) draftLines.push(`行${r}: ${cells.join(' ')}`);
-  }
-  const draftStr = draftLines.length ? draftLines.join('\n') : '（像素匹配无结果）';
-
-  const prompt =
-    `这是拼豆图纸第 ${rowStart}～${rowStart + rowCount - 1} 行（${rowCount} 行×${cols} 列）的条带图片。\n\n` +
-    `【可用色号表（共 ${colorPalette.length} 种，格式：色号(R,G,B)）】\n${paletteStr}\n\n` +
-    `【像素颜色初稿，供参考可纠正】\n${draftStr}\n\n` +
-    `请综合以下三个维度判断每个有颜色的格子的色号：\n` +
-    `① 视觉颜色——格子的实际颜色与色号表中 RGB 的接近程度\n` +
-    `② 印刷文字——格子内印的色号文字（浅色格看黑色小字，深色格看白色小字）\n` +
-    `③ 图案连贯——相邻格子的颜色关系与整体图案形状\n\n` +
-    `规则：\n` +
-    `• 色号必须来自上方色号表，不得输出表外色号\n` +
-    `• 完全空白无文字的格子直接跳过\n` +
-    `• 行号从 ${rowStart} 开始，列号从 0 开始\n\n` +
-    `只输出 JSON 数组：[[行号, 列号, "色号"], ...]，不含任何解释。`;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 90000);
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cfg.apiKey}`,
-      {
-        method: 'POST',
-        signal: controller.signal,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [
-            { inline_data: { mime_type: 'image/jpeg', data: base64 } },
-            { text: prompt }
-          ]}],
-          generationConfig: { maxOutputTokens: 8192 }
-        })
-      }
-    );
-    clearTimeout(timeout);
-    if (!res.ok) {
-      const errBody = await res.text();
-      console.warn('Gemini API error', res.status, errBody);
-      return null;
-    }
-    const data = await res.json();
-    const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
-    const m = text.match(/\[[\s\S]*\]/);
-    if (!m) { console.warn('Gemini Vision: no JSON in response', text.slice(0, 200)); return null; }
-    return JSON.parse(m[0]);
-  } catch(e) {
-    clearTimeout(timeout);
-    if (e.name === 'AbortError') console.warn('Gemini Vision: 请求超时（90s）');
-    else console.warn('Gemini Vision fetch error', e);
-    return null;
-  }
-}
 
 
 
@@ -3398,6 +3241,7 @@ function doGridAnalyze() {
 // ══════════════════════════════════════════
 let hlDrawingId = null;
 let hlImg = null;
+let hlEnhanceMode = 'original'; // 'original' | 'contrast' | 'sharpen' | 'both'
 let hlGrid = { x: 0, y: 0, w: 0, h: 0, cols: 40, rows: 40 };
 let hlColorMap = null;
 let hlHighlighted = new Set();
@@ -3939,6 +3783,34 @@ function drawHlCanvas() {
   ctx.restore();
 }
 
+function enhanceImageData(imageData, mode) {
+  if (!mode || mode === 'original') return;
+  const d = imageData.data, w = imageData.width, h = imageData.height;
+  if (mode === 'contrast' || mode === 'both') {
+    const f = 1.5;
+    for (let i = 0; i < d.length; i += 4) {
+      d[i]   = Math.max(0, Math.min(255, (d[i]   - 128) * f + 128));
+      d[i+1] = Math.max(0, Math.min(255, (d[i+1] - 128) * f + 128));
+      d[i+2] = Math.max(0, Math.min(255, (d[i+2] - 128) * f + 128));
+    }
+  }
+  if (mode === 'sharpen' || mode === 'both') {
+    const src = new Uint8ClampedArray(d);
+    const K = [0, -1, 0, -1, 5, -1, 0, -1, 0];
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        for (let c = 0; c < 3; c++) {
+          let s = 0;
+          for (let ky = -1; ky <= 1; ky++)
+            for (let kx = -1; kx <= 1; kx++)
+              s += src[((y + ky) * w + (x + kx)) * 4 + c] * K[(ky + 1) * 3 + (kx + 1)];
+          d[(y * w + x) * 4 + c] = Math.max(0, Math.min(255, s));
+        }
+      }
+    }
+  }
+}
+
 async function doHighlightScan() {
   if (!hlImg) { toast('请先上传图纸图片', 'warn'); return; }
   const allDbColors = DB.getColors();
@@ -3983,6 +3855,11 @@ async function doHighlightScan() {
     Math.min(hlImg.width  - Math.floor(hlGrid.x), Math.ceil(hlGrid.w)),
     Math.min(hlImg.height - Math.floor(hlGrid.y), Math.ceil(hlGrid.h))
   );
+  if (hlEnhanceMode !== 'original') {
+    hintEl.textContent = '图像增强中…';
+    await new Promise(r => setTimeout(r, 0));
+    enhanceImageData(imgData, hlEnhanceMode);
+  }
   const iw = imgData.width, ih = imgData.height;
 
   // Sample 9 points spread across each cell (avoiding dead center where text sits)
@@ -4045,11 +3922,9 @@ async function doHighlightScan() {
     }
   }
 
-  // ── 阶段 2：AI 精准识别（Gemini 优先，其次 Claude，均需配置 API Key） ──────
-  const _aiVisionFn = hasBailianConfig() ? _callBailianVision
-                    : hasGeminiConfig()  ? _callGeminiVision
-                    : null;
-  const _aiLabel = hasBailianConfig() ? '百炼 AI' : 'Gemini AI';
+  // ── 阶段 2：AI 精准识别（百炼，需配置 API Key） ──────────────────────────────
+  const _aiVisionFn = hasBailianConfig() ? _callBailianVision : null;
+  const _aiLabel = '百炼 AI';
   if (_aiVisionFn) {
     const CLAUDE_STRIP_ROWS = 15; // 每条带行数，过大会降低识别精度
     const MAX_CLAUDE_DIM = 3000;  // 上传前最大边长（像素）
@@ -4065,11 +3940,17 @@ async function doHighlightScan() {
       const stripOff = document.createElement('canvas');
       stripOff.width  = Math.round(hlGrid.w);
       stripOff.height = Math.round(stripRowCount * cellH);
-      stripOff.getContext('2d').drawImage(
+      const stripCtx = stripOff.getContext('2d');
+      stripCtx.drawImage(
         hlImg,
         hlGrid.x, hlGrid.y + rowStart * cellH, hlGrid.w, stripRowCount * cellH,
         0, 0, stripOff.width, stripOff.height
       );
+      if (hlEnhanceMode !== 'original') {
+        const sd = stripCtx.getImageData(0, 0, stripOff.width, stripOff.height);
+        enhanceImageData(sd, hlEnhanceMode);
+        stripCtx.putImageData(sd, 0, 0);
+      }
 
       // 按需放大，提升识别率
       const upScale = Math.min(3, Math.min(MAX_CLAUDE_DIM / stripOff.width, MAX_CLAUDE_DIM / stripOff.height));
@@ -5667,7 +5548,6 @@ if (!localStorage.getItem(BAIDU_STORAGE_KEY)) {
 }
 updateOCREngineLabel();
 _updateBailianBtn();
-_updateGeminiBtn();
 initDefaultColors();
 document.getElementById('page-colors').classList.add('active');
 renderColorsGrid();
