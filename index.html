@@ -1132,7 +1132,6 @@ input[type=color]{width:34px;height:34px;padding:2px;border:1px solid var(--bord
           <button class="btn btn-xs btn-outline" onclick="resetHlGrid()">重置网格</button>
           <button class="btn btn-xs btn-outline" id="hlSaveBtn" onclick="saveHlScan()" style="display:none">💾 保存结果</button>
           <button class="btn btn-xs btn-outline" id="hlClearScanBtn" onclick="clearHlScan()" style="display:none">🗑 清除保存</button>
-          <button class="btn btn-xs btn-warning" id="hlRescanBtn" onclick="enterRescanMode()" style="display:none">⬜ <span id="hlUnrecognizedCount">0</span> 格未识别</button>
           <button class="btn btn-xs btn-outline" id="hlEditBtn" onclick="enterEditMode()" style="display:none">✏️ 手动编辑</button>
           <div class="divider"></div>
           <button class="btn-icon" onclick="hlZoomBy(-0.15)">−</button>
@@ -1140,13 +1139,6 @@ input[type=color]{width:34px;height:34px;padding:2px;border:1px solid var(--bord
           <button class="btn-icon" onclick="hlZoomBy(0.15)">+</button>
           <button class="btn-icon" onclick="hlResetZoom()" title="适应窗口">⊙</button>
           <span class="text-xs text-muted" id="hlHint" style="margin-left:4px">滚轮缩放·空格+左键平移·拖角点调整网格</span>
-        </div>
-        <div id="hlRescanControls" class="flex gap-2 items-center flex-wrap mb-2" style="display:none;background:#fef9c3;border:1px solid #fbbf24;border-radius:6px;padding:6px 10px">
-          <span class="text-xs font-bold" style="color:#92400e">补扫模式</span>
-          <button class="btn btn-xs btn-outline" onclick="hlRescanSelectAll()">全选未识别</button>
-          <button class="btn btn-xs btn-outline" onclick="hlRescanClearSel()">取消全选</button>
-          <button class="btn btn-xs btn-primary" id="hlDoRescanBtn" onclick="doRescanSelected()">🔍 重新识别 (0)</button>
-          <button class="btn btn-xs btn-outline" onclick="exitRescanMode()">退出</button>
         </div>
         <div id="hlEditControls" class="flex gap-2 items-center flex-wrap mb-2" style="display:none;background:#ede9fe;border:1px solid #7c3aed;border-radius:6px;padding:6px 10px">
           <span class="text-xs font-bold" style="color:#5b21b6">编辑模式</span>
@@ -2782,20 +2774,23 @@ async function _callBailianVision(canvas, rowStart, rowCount, cols, colorPalette
     : '';
 
   const prompt =
-    `这是拼豆图纸第 ${rowStart}～${rowStart + rowCount - 1} 行（${rowCount} 行×${cols} 列）的条带图片。\n\n` +
+    `这是拼豆图纸第 ${rowStart}～${rowStart + rowCount - 1} 行（共 ${rowCount} 行×${cols} 列 = ${rowCount * cols} 个格子）的条带图片。\n\n` +
+    `图片上已叠加红色网格线将每个格子分隔开，每行左侧有红色行号（${rowStart}～${rowStart + rowCount - 1}），请以这些行号为准返回坐标。\n\n` +
     `【可用色号表（共 ${colorPalette.length} 种，格式：色号(R,G,B)）】\n${paletteStr}\n\n` +
-    `【像素颜色初稿（仅供参考，文字优先于颜色）】\n${draftStr}\n\n` +
+    `【像素颜色初稿（仅供参考，以你读到的印刷文字为最终依据）】\n${draftStr}\n\n` +
     `【识别规则——严格按优先级执行】\n\n` +
-    `▶ 第一优先（最准确）：读取格子内印刷的色号文字\n` +
+    `▶ 第一优先（唯一可靠依据）：读取每个格子内印刷的色号文字\n` +
     `  · 浅色/白色格子：找黑色细小字（如"H2""H17""A21"）\n` +
     `  · 深色格子：找白色或浅色小字\n` +
-    `  · 认出文字即为色号，不受格子颜色影响；颜色相近的色号（如 H17 与 H22）请只看文字，不要靠颜色猜测\n\n` +
-    `▶ 第二优先：视觉颜色——文字无法辨认时，参考格子 RGB 与色号表的接近程度\n\n` +
-    `▶ 辅助：图案连贯——相邻格子关系辅助判断边界\n\n` +
+    `  · 读到什么字就输出什么色号，绝对不要用颜色代替文字判断\n` +
+    `  · H17 和 H22 颜色相近但文字完全不同，必须认字而不是看颜色\n\n` +
+    `▶ 第二优先：视觉颜色——确实看不清文字时，参考 RGB 接近程度\n\n` +
     `【特别注意】${whiteNote}\n` +
-    `· 图片可能含有水印或背景文字，请忽略图上叠加的水印，只识别格子内固有的色号印刷\n` +
-    `· 只有格内既无文字又无颜色时才判为空格；不要把白色豆子误当空格\n` +
-    `· 色号必须来自上方色号表，行号从 ${rowStart} 开始，列号从 0 开始\n\n` +
+    `· 图片左侧的红色数字是行号标注，不是色号，请忽略它们\n` +
+    `· 图片可能含水印，请忽略水印，只识别格子内固有的色号印刷\n` +
+    `· 只有格内既无文字又无颜色时才是空格；不要把白色豆子误当空格\n` +
+    `· 色号必须来自上方色号表；行号用图片左侧标注的数字（${rowStart}～${rowStart + rowCount - 1}），列号从 0 开始\n\n` +
+    `请识别全部 ${rowCount * cols} 个格子（包括白色格子），只输出有颜色/有文字的格子。\n` +
     `只输出 JSON 数组：[[行号, 列号, "色号"], ...]，不含任何解释。`;
 
   const controller = new AbortController();
@@ -3250,10 +3245,6 @@ let hlDetected = [];
 let hlDragState = null;
 let hlZoom = 1;
 let hlOffset = { x: 0, y: 0 }; // image-coord pan offset (same convention as analyzeCanvas)
-let hlRescanMode = false;
-let hlRescanSelected = new Set(); // "r,c" keys of unrecognized cells selected for retry
-let hlRescanDragging = false;     // true while mouse is held in rescan mode
-let hlRescanDragAdd = true;       // true = adding cells, false = removing (set on first click)
 let hlEditMode = false;
 let hlEditColor = null;       // color code currently selected for painting
 let hlEditPainting = false;   // true while left-button is held down during drag-paint
@@ -3271,14 +3262,10 @@ function openHlModal(drawingId) {
   hlHighlighted.clear();
   hlDetected = [];
   hlDragState = null;
-  hlRescanMode = false;
-  hlRescanSelected.clear();
   hlEditMode = false;
   hlEditColor = null;
   hlEditPainting = false;
   hlEditHoverCell = null;
-  document.getElementById('hlRescanControls').style.display = 'none';
-  document.getElementById('hlRescanBtn').style.display = 'none';
   document.getElementById('hlEditControls').style.display = 'none';
   document.getElementById('hlEditBtn').style.display = 'none';
   document.getElementById('hlHighlightColorPicker').value = hlHighlightColor;
@@ -3389,7 +3376,7 @@ function setupHlCanvas() {
     e.preventDefault();
     if (e.touches.length === 2) {
       hlPinchPrevDist = _pinchDist(e); hlPinchPrevMid = _pinchMid(e);
-      hlDragState = null; hlEditPainting = false; hlRescanDragging = false;
+      hlDragState = null; hlEditPainting = false;
     } else { hlPinchPrevDist = null; hlMouseDown(_touchToMouse(e)); }
   };
   canvas.ontouchmove = e => {
@@ -3525,23 +3512,6 @@ function hlMouseDown(e) {
     }
     return;
   }
-  // In rescan mode, left drag to select/deselect unrecognized cells
-  if (hlRescanMode && e.button === 0) {
-    const pos = hlGetPos(e);
-    const cellW = hlGrid.w / hlGrid.cols, cellH = hlGrid.h / hlGrid.rows;
-    const c = Math.floor((pos.x - hlGrid.x) / cellW);
-    const r = Math.floor((pos.y - hlGrid.y) / cellH);
-    if (r >= 0 && r < hlGrid.rows && c >= 0 && c < hlGrid.cols &&
-        (!hlColorMap || !hlColorMap[r] || !hlColorMap[r][c])) {
-      const key = r + ',' + c;
-      hlRescanDragAdd = !hlRescanSelected.has(key); // first cell determines add/remove mode
-      hlRescanDragAdd ? hlRescanSelected.add(key) : hlRescanSelected.delete(key);
-      hlRescanDragging = true;
-      updateRescanCount();
-      drawHlCanvas();
-    }
-    return;
-  }
   const pos = hlGetPos(e);
   const scrPos = hlScrPos(e);
   const handleHit = hlHitHandle(scrPos);
@@ -3558,7 +3528,6 @@ function hlMouseDown(e) {
 function hlMouseMove(e) {
   const canvas = document.getElementById('hlCanvas');
   if (hlSpaceDown) {
-    hlRescanDragging = false; // space pan must not interfere with rescan drag
     canvas.style.cursor = hlDragState ? 'grabbing' : 'grab';
     if (hlDragState) {
       const scrPos = hlScrPos(e);
@@ -3567,20 +3536,6 @@ function hlMouseMove(e) {
       hlOffset.x = hlDragState.startOffset.x + dx;
       hlOffset.y = hlDragState.startOffset.y + dy;
       drawHlCanvas();
-    }
-    return;
-  }
-  if (hlRescanMode && hlRescanDragging) {
-    const pos = hlGetPos(e);
-    const cellW = hlGrid.w / hlGrid.cols, cellH = hlGrid.h / hlGrid.rows;
-    const c = Math.floor((pos.x - hlGrid.x) / cellW);
-    const r = Math.floor((pos.y - hlGrid.y) / cellH);
-    if (r >= 0 && r < hlGrid.rows && c >= 0 && c < hlGrid.cols &&
-        (!hlColorMap || !hlColorMap[r] || !hlColorMap[r][c])) {
-      const key = r + ',' + c;
-      const had = hlRescanSelected.has(key);
-      if (hlRescanDragAdd && !had) { hlRescanSelected.add(key); updateRescanCount(); drawHlCanvas(); }
-      else if (!hlRescanDragAdd && had) { hlRescanSelected.delete(key); updateRescanCount(); drawHlCanvas(); }
     }
     return;
   }
@@ -3656,7 +3611,6 @@ function hlMouseMove(e) {
 
 function hlMouseUp() {
   hlDragState = null;
-  hlRescanDragging = false;
   if (hlEditPainting) {
     hlEditPainting = false;
     // Rebuild palette counts after a paint stroke
@@ -3737,19 +3691,6 @@ function drawHlCanvas() {
     ctx.strokeStyle = hlEditColor ? '#7c3aed' : '#ef4444';
     ctx.lineWidth = 2 / hlZoom;
     ctx.strokeRect(sx, sy, cellW, cellH);
-  }
-
-  // Rescan mode: mark unrecognized cells red, selected ones green
-  if (hlRescanMode && hlColorMap) {
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        if (hlColorMap[r] && hlColorMap[r][c]) continue; // already recognized
-        const sx = hlGrid.x + c * cellW, sy = hlGrid.y + r * cellH;
-        const key = r + ',' + c;
-        ctx.fillStyle = hlRescanSelected.has(key) ? 'rgba(34,197,94,0.55)' : 'rgba(239,68,68,0.35)';
-        ctx.fillRect(sx, sy, cellW, cellH);
-      }
-    }
   }
 
   // Grid lines：普通格细线，每 5 格加粗，形成 5×5 导航区块
@@ -3926,8 +3867,8 @@ async function doHighlightScan() {
   const _aiVisionFn = hasBailianConfig() ? _callBailianVision : null;
   const _aiLabel = '百炼 AI';
   if (_aiVisionFn) {
-    const CLAUDE_STRIP_ROWS = 15; // 每条带行数，过大会降低识别精度
-    const MAX_CLAUDE_DIM = 3000;  // 上传前最大边长（像素）
+    const CLAUDE_STRIP_ROWS = 6;   // 每条带行数：越小AI识别越准（行数↓ → 每格像素↑ → 文字更清晰）
+    const MAX_CLAUDE_DIM = 4096;  // 上传前最大边长（像素）
     const totalCS = Math.ceil(rows / CLAUDE_STRIP_ROWS);
     let claudeUpdated = 0, claudeErrors = 0;
     for (let s = 0; s < totalCS; s++) {
@@ -3953,9 +3894,9 @@ async function doHighlightScan() {
       }
 
       // 按需放大，提升识别率
-      const upScale = Math.min(3, Math.min(MAX_CLAUDE_DIM / stripOff.width, MAX_CLAUDE_DIM / stripOff.height));
+      const upScale = Math.min(4, Math.min(MAX_CLAUDE_DIM / stripOff.width, MAX_CLAUDE_DIM / stripOff.height));
       let claudeCanvas = stripOff;
-      if (upScale > 1.2) {
+      if (upScale > 1.05) {
         claudeCanvas = document.createElement('canvas');
         claudeCanvas.width  = Math.round(stripOff.width  * upScale);
         claudeCanvas.height = Math.round(stripOff.height * upScale);
@@ -3964,13 +3905,36 @@ async function doHighlightScan() {
         uc.drawImage(stripOff, 0, 0, claudeCanvas.width, claudeCanvas.height);
       }
 
+      // 在放大后的图上叠加半透明网格线，帮助 AI 准确数行列坐标
+      {
+        const gc = claudeCanvas.getContext('2d');
+        const cw = claudeCanvas.width / cols;
+        const rh = claudeCanvas.height / stripRowCount;
+        gc.strokeStyle = 'rgba(180,0,0,0.35)';
+        gc.lineWidth = 1;
+        for (let ci = 0; ci <= cols; ci++) {
+          gc.beginPath(); gc.moveTo(ci * cw, 0); gc.lineTo(ci * cw, claudeCanvas.height); gc.stroke();
+        }
+        for (let ri = 0; ri <= stripRowCount; ri++) {
+          gc.beginPath(); gc.moveTo(0, ri * rh); gc.lineTo(claudeCanvas.width, ri * rh); gc.stroke();
+        }
+        // 在每行左侧标注绝对行号，帮助 AI 返回正确坐标
+        gc.font = `bold ${Math.max(10, Math.round(rh * 0.3))}px monospace`;
+        gc.fillStyle = 'rgba(180,0,0,0.75)';
+        gc.textBaseline = 'middle';
+        for (let ri = 0; ri < stripRowCount; ri++) {
+          gc.fillText(String(rowStart + ri), 2, (ri + 0.5) * rh);
+        }
+      }
+
       const results = await _aiVisionFn(claudeCanvas, rowStart, stripRowCount, cols, allColors, hlColorMap);
       if (!Array.isArray(results)) { claudeErrors++; continue; }
       for (const item of results) {
         if (!Array.isArray(item) || item.length < 3) continue;
         const [r, c, rawCode] = item;
         if (typeof r !== 'number' || typeof c !== 'number') continue;
-        if (r < 0 || r >= rows || c < 0 || c >= cols) continue;
+        // 严格校验坐标必须在本条带范围内，防止 AI 返回相对坐标写入错误位置
+        if (r < rowStart || r >= rowStart + stripRowCount || c < 0 || c >= cols) continue;
         const codeUp = String(rawCode).toUpperCase().replace(/\s/g, '');
         // 精确匹配 → 可填空格或覆盖旧值；模糊匹配 → 仅填空格，不覆盖像素已识别的结果
         let matched = allColors.find(x => x.code.toUpperCase() === codeUp);
@@ -4560,14 +4524,10 @@ function clearHlScan() {
   hlColorMap = null;
   hlDetected = [];
   hlHighlighted.clear();
-  hlRescanMode = false;
-  hlRescanSelected.clear();
   hlEditMode = false;
   hlEditColor = null;
   hlEditPainting = false;
   hlEditHoverCell = null;
-  document.getElementById('hlRescanControls').style.display = 'none';
-  document.getElementById('hlRescanBtn').style.display = 'none';
   document.getElementById('hlEditControls').style.display = 'none';
   document.getElementById('hlEditBtn').style.display = 'none';
   renderHlPalette();
@@ -4588,17 +4548,6 @@ function renderHlPalette() {
     return;
   }
   const total = hlDetected.reduce((s, e) => s + e.count, 0);
-  // Count unrecognized cells
-  let unrecognized = 0;
-  if (hlColorMap) {
-    hlColorMap.forEach(row => row.forEach(c => { if (!c) unrecognized++; }));
-  }
-  const rescanBtn = document.getElementById('hlRescanBtn');
-  const unrecognizedCountEl = document.getElementById('hlUnrecognizedCount');
-  if (rescanBtn && unrecognizedCountEl) {
-    unrecognizedCountEl.textContent = unrecognized;
-    rescanBtn.style.display = unrecognized > 0 ? '' : 'none';
-  }
   const editBtn = document.getElementById('hlEditBtn');
   if (editBtn) editBtn.style.display = hlColorMap ? '' : 'none';
   el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:5px">
@@ -4685,24 +4634,6 @@ function renderHlRequirements() {
   }
 }
 
-function enterRescanMode() {
-  if (!hlColorMap) return;
-  hlRescanMode = true;
-  // Don't clear selection — preserve from previous session so user can re-scan same cells
-  document.getElementById('hlRescanControls').style.display = 'flex';
-  document.getElementById('hlHint').textContent = '点击红色格子选中补扫（绿色=已选），右键平移';
-  updateRescanCount();
-  drawHlCanvas();
-}
-function exitRescanMode() {
-  hlRescanMode = false;
-  hlRescanSelected.clear();
-  hlRescanDragging = false;
-  document.getElementById('hlRescanControls').style.display = 'none';
-  document.getElementById('hlHint').textContent = '滚轮缩放·空格+左键平移·拖角点调整网格';
-  drawHlCanvas();
-}
-
 // ── Edit mode ──
 function enterEditMode() {
   if (!hlColorMap) return;
@@ -4762,169 +4693,6 @@ function _hlRebuildDetected() {
     .map(([code, count]) => ({ code, count, color: allColors.find(x => x.code.toUpperCase() === code) }))
     .sort((a, b) => b.count - a.count);
 }
-function hlRescanSelectAll() {
-  if (!hlColorMap) return;
-  hlRescanSelected.clear();
-  for (let r = 0; r < hlGrid.rows; r++)
-    for (let c = 0; c < hlGrid.cols; c++)
-      if (!hlColorMap[r] || !hlColorMap[r][c]) hlRescanSelected.add(r + ',' + c);
-  updateRescanCount();
-  drawHlCanvas();
-}
-function hlRescanClearSel() {
-  hlRescanSelected.clear();
-  updateRescanCount();
-  drawHlCanvas();
-}
-function updateRescanCount() {
-  const btn = document.getElementById('hlDoRescanBtn');
-  if (btn) btn.textContent = `🔍 重新识别 (${hlRescanSelected.size})`;
-}
-
-async function doRescanSelected() {
-  if (!hlRescanSelected.size) { toast('请先选择要补扫的格子', 'warn'); return; }
-  const cols = hlGrid.cols, rows = hlGrid.rows;
-  const cellW = hlGrid.w / cols, cellH = hlGrid.h / rows;
-  const MAX_SCALE = 4, MAX_DIM = 4096, MAX_ROWS_PER_STRIP = 45;
-
-  // Same fuzzy corrector as doHighlightScan — respect drawing's color requirements
-  const allDbColors2 = DB.getColors();
-  const drawingData2 = hlDrawingId ? DB.getDrawing(hlDrawingId) : null;
-  const reqs2 = drawingData2 && drawingData2.colorRequirements && drawingData2.colorRequirements.length
-    ? drawingData2.colorRequirements : null;
-  let allColors, allowedCodes2 = null;
-  if (reqs2) {
-    const reqIds2 = new Set(reqs2.map(r => r.colorId));
-    allColors = allDbColors2.filter(c => reqIds2.has(c.id));
-    if (allColors.length) {
-      allowedCodes2 = new Set(allColors.map(c => c.code.toUpperCase()));
-    } else {
-      allColors = allDbColors2;
-    }
-  } else {
-    allColors = allDbColors2;
-  }
-  const validCodes = allColors.map(c => c.code.toUpperCase());
-  function lev(a, b) {
-    const m = a.length, n = b.length;
-    const dp = Array.from({length:m+1}, (_,i) => Array.from({length:n+1}, (_,j) => i?j?0:i:j));
-    for (let i=1;i<=m;i++) for (let j=1;j<=n;j++)
-      dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);
-    return dp[m][n];
-  }
-  function correctCode(raw) {
-    const up = raw.toUpperCase().replace(/\s+/g, '');
-    if (!/^[A-Z]{1,3}\d{1,3}$/.test(up)) return null;
-    if (validCodes.includes(up)) return up;
-    const prefix = up.replace(/\d/g, '');
-    let best = null, bestDist = 2, bestSamePrefix = false;
-    for (const v of validCodes) {
-      const d = lev(up, v);
-      if (d >= bestDist) continue;
-      const samePrefix = v.replace(/\d/g, '') === prefix;
-      if (d < bestDist || (!bestSamePrefix && samePrefix)) { bestDist = d; best = v; bestSamePrefix = samePrefix; }
-    }
-    return bestDist === 1 ? best : up;
-  }
-
-  // Collect unique rows with selected cells, sorted
-  const selectedRows = [...new Set([...hlRescanSelected].map(k => parseInt(k.split(',')[0])))].sort((a,b) => a-b);
-
-  // Group into strips of at most MAX_ROWS_PER_STRIP starting from each first row in a group
-  const strips = [];
-  let i = 0;
-  while (i < selectedRows.length) {
-    const rowStart = selectedRows[i];
-    const rowEnd = Math.min(rowStart + MAX_ROWS_PER_STRIP - 1, rows - 1);
-    strips.push({ rowStart, rowEnd });
-    while (i < selectedRows.length && selectedRows[i] <= rowEnd) i++;
-  }
-
-  const hintEl = document.getElementById('hlHint');
-  for (let s = 0; s < strips.length; s++) {
-    const { rowStart, rowEnd } = strips[s];
-    hintEl.textContent = `补扫中… 第 ${s + 1}/${strips.length} 条`;
-    const stripRowCount = rowEnd - rowStart + 1;
-    const stripY = hlGrid.y + rowStart * cellH;
-    const stripH = stripRowCount * cellH;
-    const off = document.createElement('canvas');
-    off.width = Math.round(hlGrid.w); off.height = Math.round(stripH);
-    off.getContext('2d').drawImage(hlImg, hlGrid.x, stripY, hlGrid.w, stripH, 0, 0, off.width, off.height);
-
-    const upScale = Math.min(MAX_SCALE, Math.min(MAX_DIM / off.width, MAX_DIM / off.height));
-    let ocrCanvas = off;
-    if (upScale > 1.1) {
-      ocrCanvas = document.createElement('canvas');
-      ocrCanvas.width = Math.round(off.width * upScale);
-      ocrCanvas.height = Math.round(off.height * upScale);
-      const uctx = ocrCanvas.getContext('2d');
-      uctx.imageSmoothingEnabled = true; uctx.imageSmoothingQuality = 'high';
-      uctx.drawImage(off, 0, 0, ocrCanvas.width, ocrCanvas.height);
-    }
-
-    let words = [];
-    if (hasBaiduConfig()) {
-      try {
-        const data = await _callBaiduAccurate(ocrCanvas);
-        words = (data.words_result || []).map(w => ({ text: w.words.trim(), loc: w.location }));
-      } catch(e) { console.warn('rescan strip', s, e); }
-    }
-    if (!words.length) {
-      try {
-        const { data } = await Tesseract.recognize(ocrCanvas.toDataURL('image/png'), 'eng', {
-          tessedit_pageseg_mode: '6',
-          tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-        });
-        words = (data.words || []).map(w => ({
-          text: w.text.trim(),
-          loc: { left: w.bbox.x0, top: w.bbox.y0, width: w.bbox.x1 - w.bbox.x0, height: w.bbox.y1 - w.bbox.y0 }
-        }));
-      } catch(e) { continue; }
-    }
-
-    for (const { text, loc } of words) {
-      const norm = text.toUpperCase().replace(/\s+/g, '');
-      const combinedMatch = /^([A-Z]{1,3}\d{1,3})[（(][\d）)]+$/.exec(norm);
-      const code = correctCode(combinedMatch ? combinedMatch[1] : norm);
-      if (!code) continue;
-      const cx = (loc.left + loc.width / 2) / upScale;
-      const cy = (loc.top + loc.height / 2) / upScale;
-      const col = Math.floor(cx / cellW);
-      const localRow = Math.floor(cy / cellH);
-      const row = rowStart + localRow;
-      if (col >= 0 && col < cols && row >= 0 && row < rows) {
-        // Only fill previously empty cells
-        if (!hlColorMap[row][col]) hlColorMap[row][col] = code;
-      }
-    }
-  }
-
-  // Enforce color restriction — remove any code not in requirements
-  if (allowedCodes2) {
-    for (let r = 0; r < hlColorMap.length; r++) {
-      for (let c = 0; c < hlColorMap[r].length; c++) {
-        if (hlColorMap[r][c] && !allowedCodes2.has(hlColorMap[r][c])) hlColorMap[r][c] = null;
-      }
-    }
-  }
-
-  // Rebuild detected list
-  const countMap = {};
-  hlColorMap.forEach(row => row.forEach(c => { if (c) countMap[c] = (countMap[c]||0)+1; }));
-  hlDetected = Object.entries(countMap)
-    .map(([code, count]) => ({ code, count, color: allColors.find(c => c.code.toUpperCase() === code) }))
-    .sort((a, b) => b.count - a.count);
-
-  // Keep selection so user can re-scan the same cells again without re-selecting
-  renderHlPalette();
-  drawHlCanvas();
-  hintEl.textContent = '点击红色格子选中补扫（绿色=已选），右键平移';
-  updateRescanCount();
-  toast('补扫完成', 'success');
-  // Auto-save
-  DB.updateDrawing(hlDrawingId, { hlScan: { grid: { ...hlGrid }, colorMap: hlColorMap } });
-}
-
 function renderAnalyzeResults() {
   const resultEl = document.getElementById('analyzeResult');
   const totalEl = document.getElementById('analyzeTotal');
