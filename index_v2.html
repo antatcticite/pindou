@@ -23,7 +23,7 @@
   --r: 8px;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB',sans-serif;background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden;font-size:14px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB',sans-serif;background:var(--bg);color:var(--text);display:flex;height:calc(var(--app-vh, 1vh) * 100);overflow:hidden;font-size:14px}
 
 /* ── Sidebar ── */
 .sidebar{width:220px;background:var(--sidebar-bg);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
@@ -50,7 +50,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hira
 .page.active{display:block}
 .content.hl-page-mode{padding:0;overflow:hidden}
 #page-highlight.active{display:flex;flex-direction:column;height:100%}
-.hlpg-bar{display:flex;align-items:center;gap:8px;padding:8px 14px;background:#fff;border-bottom:1px solid var(--border);flex-shrink:0;min-height:48px;flex-wrap:wrap}
+.hlpg-bar{display:flex;align-items:center;gap:8px;padding:calc(8px + env(safe-area-inset-top)) 14px 8px 14px;background:#fff;border-bottom:1px solid var(--border);flex-shrink:0;min-height:48px;flex-wrap:wrap}
+#hlPgPalette{padding:8px 12px calc(8px + env(safe-area-inset-bottom)) 12px!important}
 .hlpg-swatch{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:5px;border-radius:10px;border:2px solid transparent;transition:.12s}
 .hlpg-swatch:hover{border-color:#e2e8f0}
 .hlpg-swatch.on{border-color:#f59e0b;box-shadow:0 0 0 2px rgba(245,158,11,.25)}
@@ -8235,6 +8236,26 @@ if (!localStorage.getItem(BAIDU_STORAGE_KEY)) {
     secretKey: 'AdgDzMLepyKJWJh5GybnwNKJa0WYOzf3',
     accessToken: ''
   }));
+}
+{
+  const setVh = () => {
+    try {
+      const h = (window.visualViewport && window.visualViewport.height) ? window.visualViewport.height : window.innerHeight;
+      document.documentElement.style.setProperty('--app-vh', (h * 0.01) + 'px');
+    } catch (e) {}
+  };
+  let raf = 0;
+  const schedule = () => {
+    if (raf) return;
+    raf = requestAnimationFrame(() => { raf = 0; setVh(); });
+  };
+  setVh();
+  window.addEventListener('resize', schedule, { passive: true });
+  window.addEventListener('orientationchange', schedule, { passive: true });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', schedule, { passive: true });
+    window.visualViewport.addEventListener('scroll', schedule, { passive: true });
+  }
 }
 repairLocalStorageArrayKey(DB.KEY_COLORS, '色号');
 repairLocalStorageArrayKey(DB.KEY_DRAWINGS, '图纸');
