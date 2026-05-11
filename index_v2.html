@@ -3916,52 +3916,38 @@ function _hlTxtExtractBinFromCell(wbData, x0, y0, x1, y1, iw, W, H) {
   const sx0 = x0 + pad, sy0 = y0 + pad;
   const sx1 = x1 - pad, sy1 = y1 - pad;
   if (sx1 <= sx0 || sy1 <= sy0) return null;
-  const lumArr = new Float32Array(W * H);
-  let sum = 0;
-  let minLum = 255, maxLum = 0;
+  const N = W * H;
+  const lumArr = new Float32Array(N);
+  const darkArr = new Float32Array(N);
+  const whiteArr = new Float32Array(N);
+  let minLum = 255, maxLum = 0, minDark = 255, maxDark = 0, minWhite = 255, maxWhite = 0;
   for (let yy = 0; yy < H; yy++) {
     const py = Math.min(sy1 - 1, Math.max(sy0, Math.round(sy0 + (yy + 0.5) * ((sy1 - sy0) / H))));
     for (let xx = 0; xx < W; xx++) {
       const px = Math.min(sx1 - 1, Math.max(sx0, Math.round(sx0 + (xx + 0.5) * ((sx1 - sx0) / W))));
       const i = (py * iw + px) * 4;
       const r = wbData.data[i], g = wbData.data[i + 1], b = wbData.data[i + 2];
+      const mx = Math.max(r, g, b);
+      const mn = Math.min(r, g, b);
       const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-      lumArr[yy * W + xx] = lum;
-      sum += lum;
+      const idx = yy * W + xx;
+      lumArr[idx] = lum;
+      darkArr[idx] = 255 - mx;
+      whiteArr[idx] = mn;
       if (lum < minLum) minLum = lum;
       if (lum > maxLum) maxLum = lum;
+      const dv = 255 - mx;
+      if (dv < minDark) minDark = dv;
+      if (dv > maxDark) maxDark = dv;
+      if (mn < minWhite) minWhite = mn;
+      if (mn > maxWhite) maxWhite = mn;
     }
   }
-  const N = W * H;
-  const rawRange = maxLum - minLum;
-  if (rawRange < 4) return null;
+  const rawRangeLum = maxLum - minLum;
+  const rawRangeDark = maxDark - minDark;
+  const rawRangeWhite = maxWhite - minWhite;
+  if (rawRangeLum < 3 && rawRangeDark < 3 && rawRangeWhite < 3) return null;
 
-  const histRaw = new Uint32Array(256);
-  for (let i = 0; i < N; i++) {
-    const v = Math.max(0, Math.min(255, lumArr[i] | 0));
-    histRaw[v]++;
-  }
-  const pLow = Math.max(1, Math.round(N * 0.03));
-  const pHigh = Math.max(1, Math.round(N * 0.97));
-  let lo = 0, hi = 255;
-  {
-    let cum = 0;
-    for (let v = 0; v < 256; v++) { cum += histRaw[v]; if (cum >= pLow) { lo = v; break; } }
-    cum = 0;
-    for (let v = 0; v < 256; v++) { cum += histRaw[v]; if (cum >= pHigh) { hi = v; break; } }
-  }
-  if ((hi - lo) < 6) { lo = minLum; hi = maxLum; }
-  const range = Math.max(1, hi - lo);
-
-  const histN = new Uint32Array(256);
-  let sumN = 0;
-  for (let i = 0; i < N; i++) {
-    const ln = Math.max(0, Math.min(255, ((lumArr[i] - lo) * 255 / range)));
-    const v = ln | 0;
-    histN[v]++;
-    sumN += v;
-  }
-  const meanN = sumN / N;
   const otsu = (hist, total) => {
     let sumAll = 0;
     for (let t = 0; t < 256; t++) sumAll += t * hist[t];
@@ -3979,64 +3965,102 @@ function _hlTxtExtractBinFromCell(wbData, x0, y0, x1, y1, iw, W, H) {
     }
     return thr;
   };
-  const t0 = otsu(histN, N);
-  const cand = Array.from(new Set([
-    Math.round(t0),
-    Math.round(t0 - 10),
-    Math.round(t0 + 10),
-    Math.round(meanN),
-    Math.round(meanN - 12),
-    Math.round(meanN + 12),
-  ])).map(v => Math.max(0, Math.min(255, v)));
-
-  const okMin = rawRange < 12 ? 0.003 : 0.006;
-  const okMax = 0.55;
-  const target = 0.10;
-  let bestMode = '';
-  let bestT = 0;
-  let bestScore = Infinity;
-  for (const t of cand) {
-    let blackD = 0, blackL = 0;
+  const build = (arr, rawRange) => {
+    if (rawRange < 3) return null;
+    const histRaw = new Uint32Array(256);
     for (let i = 0; i < N; i++) {
-      const ln = Math.max(0, Math.min(255, ((lumArr[i] - lo) * 255 / range)));
-      if (ln < t) blackD++;
-      if (ln > t) blackL++;
+      const v = Math.max(0, Math.min(255, arr[i] | 0));
+      histRaw[v]++;
     }
-    const brD = blackD / N;
-    const brL = blackL / N;
-    if (brD >= okMin && brD <= okMax) {
-      const s = Math.abs(brD - target) + (brD < 0.01 ? (0.01 - brD) * 1.8 : 0);
-      if (s < bestScore) { bestScore = s; bestMode = 'dark'; bestT = t; }
+    const pLow = Math.max(1, Math.round(N * 0.03));
+    const pHigh = Math.max(1, Math.round(N * 0.97));
+    let lo = 0, hi = 255;
+    {
+      let cum = 0;
+      for (let v = 0; v < 256; v++) { cum += histRaw[v]; if (cum >= pLow) { lo = v; break; } }
+      cum = 0;
+      for (let v = 0; v < 256; v++) { cum += histRaw[v]; if (cum >= pHigh) { hi = v; break; } }
     }
-    if (brL >= okMin && brL <= okMax) {
-      const s = Math.abs(brL - target) + (brL < 0.01 ? (0.01 - brL) * 1.8 : 0);
-      if (s < bestScore) { bestScore = s; bestMode = 'light'; bestT = t; }
-    }
-  }
-  if (!bestMode) return null;
+    if ((hi - lo) < 5) return null;
+    const range = Math.max(1, hi - lo);
 
-  const bits = new Uint8Array(N);
-  for (let i = 0; i < N; i++) {
-    const ln = Math.max(0, Math.min(255, ((lumArr[i] - lo) * 255 / range)));
-    bits[i] = bestMode === 'dark' ? (ln < bestT ? 1 : 0) : (ln > bestT ? 1 : 0);
-  }
-  if (W >= 6 && H >= 6) {
-    const out = bits.slice();
-    for (let yy = 1; yy < H - 1; yy++) {
-      for (let xx = 1; xx < W - 1; xx++) {
-        const idx = yy * W + xx;
-        if (!bits[idx]) continue;
-        let c = 0;
-        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) c += bits[(yy + dy) * W + (xx + dx)] ? 1 : 0;
-        if (c <= 1) out[idx] = 0;
+    const histN = new Uint32Array(256);
+    let sumN = 0;
+    for (let i = 0; i < N; i++) {
+      const ln = Math.max(0, Math.min(255, ((arr[i] - lo) * 255 / range)));
+      const v = ln | 0;
+      histN[v]++;
+      sumN += v;
+    }
+    const meanN = sumN / N;
+    const t0 = otsu(histN, N);
+    const cand = Array.from(new Set([
+      Math.round(t0),
+      Math.round(t0 - 10),
+      Math.round(t0 + 10),
+      Math.round(meanN),
+      Math.round(meanN - 12),
+      Math.round(meanN + 12),
+    ])).map(v => Math.max(0, Math.min(255, v)));
+
+    const okMin = rawRange < 10 ? 0.0025 : 0.006;
+    const okMax = 0.55;
+    const target = rawRange < 10 ? 0.07 : 0.10;
+    let bestMode = '';
+    let bestT = 0;
+    let bestScore = Infinity;
+    for (const t of cand) {
+      let blackD = 0, blackL = 0;
+      for (let i = 0; i < N; i++) {
+        const ln = Math.max(0, Math.min(255, ((arr[i] - lo) * 255 / range)));
+        if (ln < t) blackD++;
+        if (ln > t) blackL++;
+      }
+      const brD = blackD / N;
+      const brL = blackL / N;
+      if (brD >= okMin && brD <= okMax) {
+        const s = Math.abs(brD - target) + (brD < 0.01 ? (0.01 - brD) * 1.8 : 0);
+        if (s < bestScore) { bestScore = s; bestMode = 'dark'; bestT = t; }
+      }
+      if (brL >= okMin && brL <= okMax) {
+        const s = Math.abs(brL - target) + (brL < 0.01 ? (0.01 - brL) * 1.8 : 0);
+        if (s < bestScore) { bestScore = s; bestMode = 'light'; bestT = t; }
       }
     }
-    let black = 0;
-    for (let i = 0; i < N; i++) black += out[i] ? 1 : 0;
-    const br = black / N;
-    if (br >= okMin && br <= okMax) return _hlTxtPackBits(out);
-  }
-  return _hlTxtPackBits(bits);
+    if (!bestMode) return null;
+
+    const bits = new Uint8Array(N);
+    for (let i = 0; i < N; i++) {
+      const ln = Math.max(0, Math.min(255, ((arr[i] - lo) * 255 / range)));
+      bits[i] = bestMode === 'dark' ? (ln < bestT ? 1 : 0) : (ln > bestT ? 1 : 0);
+    }
+    if (W >= 6 && H >= 6) {
+      const out = bits.slice();
+      for (let yy = 1; yy < H - 1; yy++) {
+        for (let xx = 1; xx < W - 1; xx++) {
+          const idx = yy * W + xx;
+          if (!bits[idx]) continue;
+          let c = 0;
+          for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) c += bits[(yy + dy) * W + (xx + dx)] ? 1 : 0;
+          if (c <= 1) out[idx] = 0;
+        }
+      }
+      let black = 0;
+      for (let i = 0; i < N; i++) black += out[i] ? 1 : 0;
+      const br = black / N;
+      if (br >= okMin && br <= okMax) return { packed: _hlTxtPackBits(out), score: bestScore };
+    }
+    return { packed: _hlTxtPackBits(bits), score: bestScore };
+  };
+
+  const cand = [
+    build(lumArr, rawRangeLum),
+    build(darkArr, rawRangeDark),
+    build(whiteArr, rawRangeWhite),
+  ].filter(Boolean);
+  if (!cand.length) return null;
+  cand.sort((a, b) => a.score - b.score);
+  return cand[0].packed;
 }
 
 function _hlTxtJaccardPacked(a, b) {
