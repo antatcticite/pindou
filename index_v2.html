@@ -605,10 +605,6 @@ input[type=color]{width:34px;height:34px;padding:2px;border:1px solid var(--bord
           <input type="checkbox" id="hlPgShowCodesChk" onchange="hlPg.showCodes=this.checked;hlPgDraw()">
           显示色号
         </label>
-        <label class="text-xs text-muted" style="display:flex;align-items:center;gap:4px;user-select:none">
-          <input type="checkbox" id="hlPgShowCoordsChk" checked onchange="hlPg.showCoords=this.checked;hlPgDraw()">
-          坐标
-        </label>
       </div>
       <div id="hlPgWrap" style="flex:1;overflow:hidden;position:relative;touch-action:none;background:#18181b">
         <canvas id="hlPgCanvas" style="display:block;width:100%;height:100%"></canvas>
@@ -5569,8 +5565,6 @@ function hlPgLoad(id) {
   hlPg.sel.clear();
   const chk = document.getElementById('hlPgShowCodesChk');
   if (chk) chk.checked = !!hlPg.showCodes;
-  const chk2 = document.getElementById('hlPgShowCoordsChk');
-  if (chk2) chk2.checked = !!hlPg.showCoords;
   const allColors = DB.getColors();
   const cm = {};
   const ig = d.hlScan.ignoreMap || null;
@@ -5656,38 +5650,38 @@ function hlPgDraw() {
     const cw = G.w / G.cols, ch = G.h / G.rows;
     const scrW = cw * zoom, scrH = ch * zoom;
     if (scrW >= 16 && scrH >= 16) {
-      const fontPx = Math.max(10, Math.min(18, Math.min(cw, ch) * 0.42));
-      ctx.font = `700 ${fontPx}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
+      const step = scrW >= 26 ? 5 : (scrW >= 18 ? 10 : 20);
+      const fontScr = Math.max(10, Math.min(16, scrW * 0.38));
+      ctx.font = `700 ${fontScr / zoom}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.lineWidth = Math.max(1, 3 / zoom);
       ctx.strokeStyle = 'rgba(255,255,255,0.88)';
       ctx.fillStyle = 'rgba(17,17,17,0.92)';
-      const topY = G.y - ch * 0.55;
-      const leftX = G.x - cw * 0.55;
-      const step = 5;
+      const topY = G.y + (fontScr / zoom) * 0.85;
+      const leftX = G.x + (fontScr / zoom) * 0.85;
       for (let c = 0; c <= G.cols; c++) {
         if (c % step !== 0 && c !== G.cols) continue;
         const x = G.x + c * cw;
         const label = String(c);
-        if (topY > -ch * 0.3) { ctx.strokeText(label, x, topY); ctx.fillText(label, x, topY); }
+        ctx.strokeText(label, x, topY); ctx.fillText(label, x, topY);
       }
       for (let r = 0; r <= G.rows; r++) {
         if (r % step !== 0 && r !== G.rows) continue;
         const y = G.y + r * ch;
         const label = String(r);
-        if (leftX > -cw * 0.3) { ctx.strokeText(label, leftX, y); ctx.fillText(label, leftX, y); }
+        ctx.strokeText(label, leftX, y); ctx.fillText(label, leftX, y);
       }
     }
   }
-  if (showCodes && colorMap && zoom >= 0.6) {
+  if (showCodes && colorMap) {
     const cw = G.w / G.cols, ch = G.h / G.rows;
     const scrW = cw * zoom, scrH = ch * zoom;
     if (scrW >= 14 && scrH >= 14) {
-      const fontPx = Math.max(7, Math.min(cw, ch) * 0.38);
+      const fontScr = Math.max(7, Math.min(14, scrW * 0.40));
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = `600 ${fontPx}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
+      ctx.font = `600 ${fontScr / zoom}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
       ctx.lineWidth = Math.max(1, 3 / zoom);
       for (let r = 0; r < G.rows; r++) for (let c = 0; c < G.cols; c++) {
         const code = colorMap[r]?.[c];
