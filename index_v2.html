@@ -5242,6 +5242,20 @@ async function doHighlightScan() {
     for (let i = lo; i < hi; i++) { s += ss[i]; k++; }
     return k ? (s / k) : null;
   };
+  const _pickBgLum = (ss, bgLumDT, bgLumLT) => {
+    if (!ss || !ss.length) return 255;
+    const n = ss.length;
+    const p = (f) => ss[Math.max(0, Math.min(n - 1, Math.floor(n * f)))];
+    const p15 = p(0.15), p50 = p(0.50), p85 = p(0.85);
+    const contrast = p85 - p15;
+    const avg = ss.reduce((a, v) => a + v, 0) / n;
+    if (contrast < 18) return bgLumDT != null ? bgLumDT : (bgLumLT != null ? bgLumLT : avg);
+    const darkTail = p50 - p15;
+    const brightTail = p85 - p50;
+    if (darkTail >= brightTail + 6) return bgLumDT != null ? bgLumDT : avg;
+    if (brightTail >= darkTail + 6) return bgLumLT != null ? bgLumLT : avg;
+    return bgLumDT != null ? bgLumDT : (bgLumLT != null ? bgLumLT : avg);
+  };
   const _chroma = lab => Math.sqrt((lab[1] || 0) * (lab[1] || 0) + (lab[2] || 0) * (lab[2] || 0));
   const sp = {};
   for (const code of ['H2', 'H7']) {
@@ -5303,15 +5317,16 @@ async function doHighlightScan() {
       const { color: bestColor, dist } = findNearestFromLab(km.c[0], km.c[1], km.c[2], labColors);
       if (bestColor && dist < DIST_THRESHOLD) {
         let code = (bestColor.code || '').toUpperCase();
-        if (achCandidates.length >= 2 && (achHeavy || isAchromatic(bestColor.hex))) {
-          const bgLum = bgLumDT != null ? bgLumDT : (ss.reduce((a, v) => a + v, 0) / ss.length);
+        if (achCandidates.length >= 2 && (achHeavy || isAchromatic(bestColor.hex) || chroma <= 16)) {
+          const bgLum = _pickBgLum(ss, bgLumDT, bgLumLT);
           cellBgLum[row][col] = bgLum;
-          let bestA = null, bestDL = Infinity;
+          let bestA = null, bestDL = Infinity, secondDL = Infinity;
           for (const ac of achCandidates) {
             const dl = Math.abs(bgLum - ac.lum);
-            if (dl < bestDL) { bestDL = dl; bestA = ac; }
+            if (dl < bestDL) { secondDL = bestDL; bestDL = dl; bestA = ac; }
+            else if (dl < secondDL) secondDL = dl;
           }
-          if (bestA && bestDL <= 26) code = bestA.code;
+          if (bestA && bestDL <= 26 && (secondDL - bestDL) >= 4) code = bestA.code;
         }
         if (code) hlColorMap[row][col] = code;
       } else if (spCode) {
@@ -5542,9 +5557,9 @@ async function doHighlightScan() {
               }
             }
             const ss = lums.sort((a, b) => a - b);
-            const cutLow = Math.min(ss.length - 1, Math.floor(ss.length * 0.30));
-            const kept = ss.slice(cutLow);
-            lum = kept.length ? kept.reduce((a, v) => a + v, 0) / kept.length : (ss.reduce((a, v) => a + v, 0) / ss.length);
+            const bgLumDT = _trimMean(ss, 0.30, 0.05);
+            const bgLumLT = _trimMean(ss, 0.05, 0.30);
+            lum = _pickBgLum(ss, bgLumDT, bgLumLT);
             cellBgLum[r][c] = lum;
           }
           pool.push({ r, c, lum });
