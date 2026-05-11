@@ -4309,8 +4309,17 @@ function hlTxtRescan(ev) {
           colorDecided = true;
         }
       }
+      let bestD = Infinity;
+      let cur = hlColorMap?.[r]?.[c] ? String(hlColorMap[r][c]).toUpperCase() : '';
+      let curD = cur ? Infinity : Infinity;
+      if (best) {
+        if (!cellLab) cellLab = _hlSampleCellBgLab(wbData, x0, y0, x1, y1, iw);
+        bestD = _hlLabDist(cellLab, _hlGetLabByCode(best));
+        curD = cur ? _hlLabDist(cellLab, _hlGetLabByCode(cur)) : Infinity;
+      }
+      const colorStrong = !!(best && Number.isFinite(bestD) && bestD <= 26 && (!cur || (Number.isFinite(curD) && curD >= bestD + 8)));
       const gap = bestS - second;
-      if (!best || bestS < 0.22 || (!colorDecided && gap < 0.04)) {
+      if (!best || bestS < 0.22 || ((!colorDecided && !colorStrong) && gap < 0.04)) {
         if (onlySelected && hlTxtDropUnmatched && hlColorMap[r][c]) {
           hlColorMap[r][c] = null;
           updated++;
@@ -4319,10 +4328,6 @@ function hlTxtRescan(ev) {
         continue;
       }
       {
-        if (!cellLab) cellLab = _hlSampleCellBgLab(wbData, x0, y0, x1, y1, iw);
-        const bestD = _hlLabDist(cellLab, _hlGetLabByCode(best));
-        const cur = hlColorMap?.[r]?.[c] ? String(hlColorMap[r][c]).toUpperCase() : '';
-        const curD = cur ? _hlLabDist(cellLab, _hlGetLabByCode(cur)) : Infinity;
         if (bestD > 40) {
           if (onlySelected && hlTxtDropUnmatched && hlColorMap[r][c]) {
             hlColorMap[r][c] = null;
@@ -5167,13 +5172,18 @@ async function _hlTxtAssistApply(imgData, rows, cols, cellW, cellH, allowedCodes
           colorDecided = true;
         }
       }
-      const gap = bestS - second;
-      if (!best || bestS < 0.28 || (!colorDecided && gap < 0.06)) continue;
-      {
+      let bestD = Infinity;
+      const cur = hlColorMap?.[r]?.[c] ? String(hlColorMap[r][c]).toUpperCase() : '';
+      let curD = cur ? Infinity : Infinity;
+      if (best) {
         if (!cellLab) cellLab = _hlSampleCellBgLab(imgData, x0, y0, x1, y1, iw);
-        const bestD = _hlLabDist(cellLab, _hlGetLabByCode(best));
-        const cur = hlColorMap?.[r]?.[c] ? String(hlColorMap[r][c]).toUpperCase() : '';
-        const curD = cur ? _hlLabDist(cellLab, _hlGetLabByCode(cur)) : Infinity;
+        bestD = _hlLabDist(cellLab, _hlGetLabByCode(best));
+        curD = cur ? _hlLabDist(cellLab, _hlGetLabByCode(cur)) : Infinity;
+      }
+      const colorStrong = !!(best && Number.isFinite(bestD) && bestD <= 24 && (!cur || (Number.isFinite(curD) && curD >= bestD + 8)));
+      const gap = bestS - second;
+      if (!best || bestS < 0.28 || ((!colorDecided && !colorStrong) && gap < 0.06)) continue;
+      {
         if (bestD > 38) continue;
         if (cur && curD <= 28 && bestD > curD + 10) continue;
       }
