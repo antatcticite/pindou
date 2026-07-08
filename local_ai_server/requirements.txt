@@ -1,0 +1,7 @@
+rapidocr_onnxruntime
+rapidocr
+onnxruntime
+numpy
+Pillow
+paddleocr
+paddlepaddle

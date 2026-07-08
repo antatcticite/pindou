@@ -4,3 +4,7 @@ Thumbs.db
 *.swo
 *~
 .claude/
+local_ai_server/vlm.env
+local_ai_server/__pycache__/
+local_ai_server/.paddlex_cache/
+*.pyc

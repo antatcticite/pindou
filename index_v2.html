@@ -183,6 +183,26 @@ select.form-control{background:#fff}
 .canvas-wrap{position:relative;background:#e2e8f0;border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;min-height:300px}
 #analyzeCanvas{display:block;cursor:crosshair;max-width:100%;height:auto;image-rendering:auto}
 .canvas-hint{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.6);color:#fff;font-size:12px;padding:4px 10px;border-radius:20px;white-space:nowrap;pointer-events:none}
+#modalAnalyze .modal{width:96vw;max-width:1320px;height:92vh;display:flex;flex-direction:column;overflow:hidden}
+#modalAnalyze .modal-body{flex:1;min-height:0;overflow:hidden}
+.analyze-layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;height:100%;min-height:0}
+.analyze-left{display:flex;flex-direction:column;min-height:0;overflow:auto;padding-right:4px}
+.analyze-left-pinned{position:sticky;top:0;z-index:5;background:#fff;padding:0 0 10px;margin-bottom:10px}
+.analyze-left .tool-controls{padding:0 0 8px;margin-bottom:0}
+.analyze-left .canvas-wrap{align-items:flex-start;justify-content:flex-start;min-height:420px;overflow:visible}
+.analyze-right{display:flex;flex-direction:column;min-height:0}
+.analyze-preview{border:1px solid var(--border);border-radius:8px;background:#f8fafc;overflow:hidden;flex-shrink:0}
+.analyze-preview-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);font-size:12px;font-weight:700}
+.analyze-preview-body{max-height:260px;overflow:auto;background:#fff}
+.analyze-preview-body img{display:block;width:100%;height:auto}
+.analyze-preview-empty{padding:18px 12px;text-align:center;font-size:12px;color:var(--muted);line-height:1.5}
+.analyze-results-scroll{flex:1;min-height:0;overflow-y:auto}
+.analyze-batch-panel{display:none;border:1px solid var(--border);border-radius:8px;background:#fff;margin-bottom:12px;overflow:hidden;flex-shrink:0}
+.analyze-batch-panel.show{display:block}
+.analyze-batch-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border)}
+.analyze-batch-body{padding:10px}
+.analyze-batch-body textarea{min-height:180px;resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono',monospace;font-size:12px}
+.analyze-batch-actions{display:flex;justify-content:flex-end;gap:8px;padding:10px;border-top:1px solid var(--border)}
 
 /* ── Color req list ── */
 .req-list{max-height:300px;overflow-y:auto}
@@ -375,7 +395,11 @@ input[type=color]{width:34px;height:34px;padding:2px;border:1px solid var(--bord
   }
   #hlReqSection{display:none!important}
   /* Analyze modal: single column */
-  #modalAnalyze>.modal>.modal-body{grid-template-columns:1fr!important}
+  #modalAnalyze .modal-body{overflow:auto!important}
+  .analyze-layout{grid-template-columns:1fr!important;height:auto!important}
+  .analyze-left{overflow:visible!important}
+  .analyze-right{min-height:360px}
+  .analyze-preview-body{max-height:150px}
   /* Drawing detail */
   .detail-grid{grid-template-columns:1fr!important}
   /* Cards grid */
@@ -630,7 +654,7 @@ input[type=color]{width:34px;height:34px;padding:2px;border:1px solid var(--bord
             <div id="backupStats" style="font-size:12px;color:var(--muted)"></div>
             <div>
               <button class="btn btn-primary" onclick="exportAllData()" id="exportBtn">📤 导出全部数据</button>
-              <button class="btn btn-outline" onclick="exportAllDataLite()" id="exportLiteBtn" style="margin-left:6px">⚡ 轻量导出（无图片）</button>
+              <button class="btn btn-outline" onclick="exportAllDataLite()" id="exportLiteBtn" style="margin-left:6px">⚡ 轻量导出（手机）</button>
             </div>
           </div>
         </div>
@@ -1059,51 +1083,66 @@ input[type=color]{width:34px;height:34px;padding:2px;border:1px solid var(--bord
       <button class="modal-close" onclick="teardownAnalyzeCanvas();hlWizardCancel();closeModal('modalAnalyze')">×</button>
     </div>
     <div class="modal-body">
-      <div style="display:grid;grid-template-columns:1fr 300px;gap:16px">
-        <div>
-          <div class="tool-controls">
-            <span class="text-sm text-muted">模式：</span>
-            <button class="tool-btn active" id="toolOCR" onclick="setTool('ocr')">📋 汇总OCR识别</button>
-            <button class="tool-btn" id="toolRect" onclick="setTool('rect')">📐 网格取样</button>
-            <div class="divider"></div>
-            <span class="text-sm text-muted">缩放：</span>
-            <button class="btn-icon" onclick="zoomCanvas(-0.1)">−</button>
-            <span id="zoomLabel" class="text-sm" style="min-width:40px;text-align:center">100%</span>
-            <button class="btn-icon" onclick="zoomCanvas(0.1)">+</button>
-            <button class="btn-icon" onclick="resetZoom()" title="重置">⊙</button>
+      <div class="analyze-layout">
+        <div class="analyze-left" id="analyzeLeftPane">
+          <div class="analyze-left-pinned">
+            <div class="tool-controls">
+              <span class="text-sm text-muted">模式：</span>
+              <button class="tool-btn active" id="toolOCR" onclick="setTool('ocr')">📋 图例识别</button>
+              <div class="divider"></div>
+              <span class="text-sm text-muted">缩放：</span>
+              <button class="btn-icon" onclick="zoomCanvas(-0.1)">−</button>
+              <span id="zoomLabel" class="text-sm" style="min-width:40px;text-align:center">100%</span>
+              <button class="btn-icon" onclick="zoomCanvas(0.1)">+</button>
+              <button class="btn-icon" onclick="resetZoom()" title="重置">⊙</button>
+              <button class="btn btn-sm btn-outline" onclick="analyzeScrollToBottom()">定位图例</button>
+            </div>
+            <div class="analyze-preview" id="analyzeLegendPreview">
+              <div class="analyze-preview-head">
+                <span>框选图例预览</span>
+                <button class="btn btn-xs btn-outline" onclick="clearSelection()">清除</button>
+              </div>
+              <div class="analyze-preview-body">
+                <div class="analyze-preview-empty">框选底部图例后，这里会显示放大预览，方便和识别结果对照。</div>
+              </div>
+            </div>
           </div>
           <div class="canvas-wrap" id="canvasWrap">
             <canvas id="analyzeCanvas"></canvas>
             <div class="canvas-hint" id="canvasHint">拖拽框选图纸底部的色号汇总区域</div>
           </div>
-          <!-- OCR mode controls -->
-          <div id="ocrControls" class="mt-2 flex gap-2 items-center flex-wrap">
-            <button class="btn btn-sm btn-primary" onclick="doOCRAnalyze()">📋 OCR识别汇总</button>
-            <button class="btn btn-sm btn-outline" onclick="clearSelection()">清除框选</button>
-            <button class="btn btn-sm btn-outline" onclick="openBaiduOCRSettings()" title="配置百度OCR密钥">⚙ 百度OCR</button>
-            <span id="ocrEngineLabel" class="text-xs text-muted"></span>
-          </div>
-          <!-- Grid mode controls -->
-          <div id="gridControls" class="mt-2 flex gap-2 items-center flex-wrap" style="display:none">
-            <span class="text-sm text-muted">网格尺寸：</span>
-            <input id="analyzeGridCols" type="number" min="1" value="50" style="width:70px" class="form-control" placeholder="列">
-            <span class="text-xs text-muted">×</span>
-            <input id="analyzeGridRows" type="number" min="1" value="50" style="width:70px" class="form-control" placeholder="行">
-            <span class="text-xs text-muted">（豆数）</span>
-            <button class="btn btn-sm btn-primary" onclick="doGridAnalyze()">🔍 网格取样识别</button>
-            <button class="btn btn-sm btn-outline" onclick="clearSelection()">清除框选</button>
-          </div>
         </div>
-        <div>
-          <div class="flex justify-between items-center mb-2">
-            <span class="font-bold text-sm">识别结果 <span style="font-size:11px;color:var(--muted);font-weight:400">（可多次框选累加，点击数量可修改）</span></span>
-            <div style="display:flex;gap:6px">
+        <div class="analyze-right">
+          <div class="mb-2">
+            <div class="font-bold text-sm">识别结果 <span style="font-size:11px;color:var(--muted);font-weight:400">（可多次框选累加，点击数量可修改）</span></div>
+            <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+              <button class="btn btn-xs btn-primary" id="ocrControls" onclick="localLegendAnalyze()" title="本地 OCR 识别图例">识别</button>
+              <button class="btn btn-xs btn-outline" onclick="glmLegendAnalyze()" title="智谱 GLM 视觉模型识别图例">GLM</button>
               <button class="btn btn-xs btn-outline" onclick="openAnalyzeBatchAdd()">＋ 批量添加</button>
               <button class="btn btn-xs btn-outline" onclick="clearAnalyzeResult()">清空</button>
+              <select id="analyzeSortMode" class="form-control" onchange="setAnalyzeSortMode(this.value)" style="width:auto;height:28px;font-size:12px;padding:2px 8px">
+                <option value="code">按色号</option>
+                <option value="count">按数量</option>
+              </select>
             </div>
           </div>
-          <div id="analyzeResult" style="max-height:400px;overflow-y:auto">
-            <div class="text-sm text-muted" style="padding:20px;text-align:center">框选区域后点击「开始识别」</div>
+          <div id="ocrEngineLabel" style="display:none"></div>
+          <div class="analyze-batch-panel" id="analyzeBatchPanel">
+            <div class="analyze-batch-head">
+              <span class="font-bold text-sm">批量添加色号</span>
+              <button class="modal-close" onclick="closeAnalyzeBatchAdd()">×</button>
+            </div>
+            <div class="analyze-batch-body">
+              <div class="text-xs text-muted" style="margin-bottom:8px">每行一个：色号 空格/Tab 数量，例如：A1 20</div>
+              <textarea id="analyzeBatchText" class="form-control" placeholder="A1 20&#10;H2 333"></textarea>
+            </div>
+            <div class="analyze-batch-actions">
+              <button class="btn btn-sm btn-outline" onclick="closeAnalyzeBatchAdd()">取消</button>
+              <button class="btn btn-sm btn-primary" onclick="applyAnalyzeBatchAdd()">添加到结果</button>
+            </div>
+          </div>
+          <div id="analyzeResult" class="analyze-results-scroll">
+            <div class="text-sm text-muted" style="padding:20px;text-align:center">框选区域后点击「本地模型识别图例」</div>
           </div>
           <div id="analyzeTotal" class="text-xs text-muted mt-2"></div>
         </div>
@@ -1131,7 +1170,9 @@ input[type=color]{width:34px;height:34px;padding:2px;border:1px solid var(--bord
           <input id="hlCols" type="number" min="1" value="40" class="form-control" style="width:65px" oninput="drawHlCanvas()">
           <span class="text-sm text-muted">行：</span>
           <input id="hlRows" type="number" min="1" value="40" class="form-control" style="width:65px" oninput="drawHlCanvas()">
-          <button class="btn btn-sm btn-primary" onclick="doHighlightScan()">🔍 扫描识别</button>
+          <button class="btn btn-sm btn-primary" onclick="doHighlightScan()">🔍 OCR扫描</button>
+          <button class="btn btn-sm btn-outline" onclick="doHighlightGlmScan()" title="使用 GLM-4.6V-Flash 补充/纠正候选格，不覆盖已匹配稳定的结果">GLM识别</button>
+          <span class="text-xs text-muted" style="margin-left:2px">增强：</span>
           <select id="hlEnhanceSelect" class="form-control" onchange="hlEnhanceMode=this.value" title="图像预处理：对模糊或对比度低的图纸有帮助" style="font-size:12px;padding:2px 6px;height:auto;width:auto">
             <option value="original">原图</option>
             <option value="contrast">对比度↑</option>
@@ -1143,17 +1184,12 @@ input[type=color]{width:34px;height:34px;padding:2px;border:1px solid var(--bord
             字形辅助
           </label>
           <span id="hlScopeChip" style="display:none;font-size:11px;padding:2px 8px;border-radius:10px;background:#fef3c7;color:#92400e;border:1px solid #fbbf24;white-space:nowrap"></span>
-          <button class="btn btn-xs btn-outline" onclick="resetHlGrid()">重置网格</button>
-          <button class="btn btn-xs btn-outline" id="hlSaveBtn" onclick="saveHlScan()" style="display:none">💾 保存结果</button>
-          <button class="btn btn-xs btn-outline" id="hlClearScanBtn" onclick="clearHlScan()" style="display:none">🗑 清除保存</button>
-          <button class="btn btn-xs btn-outline" id="hlEditBtn" onclick="enterEditMode()" style="display:none">✏️ 手动编辑</button>
-          <button class="btn btn-xs btn-outline" id="hlRefineBtn" onclick="openHlRefine()" style="display:none">🧩 微调</button>
           <div class="divider"></div>
           <button class="btn-icon" onclick="hlZoomBy(-0.15)">−</button>
           <span id="hlZoomLabel" class="text-sm" style="min-width:42px;text-align:center">100%</span>
           <button class="btn-icon" onclick="hlZoomBy(0.15)">+</button>
           <button class="btn-icon" onclick="hlResetZoom()" title="适应窗口">⊙</button>
-          <span class="text-xs text-muted" id="hlHint" style="margin-left:4px">滚轮缩放·空格/Alt+左键平移·拖角点调整网格</span>
+          <span class="text-xs text-muted" id="hlHint" style="margin-left:4px">滚轮上下移动·Cmd/Ctrl+滚轮缩放·Shift+滚轮横移·空格/Alt+左键平移·拖角点调整网格</span>
         </div>
         <div id="hlEditControls" class="flex gap-2 items-center flex-wrap mb-2" style="display:none;background:#ede9fe;border:1px solid #7c3aed;border-radius:6px;padding:6px 10px">
           <span class="text-xs font-bold" style="color:#5b21b6">编辑模式</span>
@@ -1191,7 +1227,7 @@ input[type=color]{width:34px;height:34px;padding:2px;border:1px solid var(--bord
             </div>
           </div>
           <div id="hlPalette" style="flex:1;overflow-y:auto">
-            <div class="text-sm text-muted" style="padding:20px;text-align:center">对齐网格后点击「扫描识别」</div>
+            <div class="text-sm text-muted" style="padding:20px;text-align:center">对齐网格后点击「OCR扫描」</div>
           </div>
           <div id="hlTotal" class="text-xs text-muted mt-1 mb-1"></div>
         </div>
@@ -1210,6 +1246,7 @@ input[type=color]{width:34px;height:34px;padding:2px;border:1px solid var(--bord
     </div>
     <div class="modal-footer" id="hlWizardFooter" style="display:none">
       <button class="btn btn-outline" onclick="hlWizardPrev()">上一步</button>
+      <button class="btn btn-outline" id="hlWizardAiUndoBtn" onclick="hlAiUndo()" style="display:none">撤销AI</button>
       <button class="btn btn-primary" onclick="hlWizardNext()">下一步</button>
     </div>
   </div>
@@ -1264,7 +1301,7 @@ input[type=color]{width:34px;height:34px;padding:2px;border:1px solid var(--bord
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <button class="btn btn-xs btn-outline" onclick="hlRefineSelAll()">全选</button>
           <button class="btn btn-xs btn-outline" onclick="hlRefineSelNone()">清除</button>
-          <button class="btn btn-xs btn-outline" onclick="hlRefineToggleSort()">排序：<span id="hlRefineSortLabel">相似</span></button>
+          <button class="btn btn-xs btn-outline" onclick="hlRefineToggleSort()">排序：<span id="hlRefineSortLabel">字形异常优先</span></button>
           <button class="btn btn-xs btn-outline" onclick="hlRefineToggleView()">视图：<span id="hlRefineViewLabel">格子</span></button>
           <span id="hlRefineMapTools" style="display:none;align-items:center;gap:8px">
             <button class="btn btn-xs btn-outline" onclick="hlRefineMapZoomOut(event)">－</button>
@@ -1284,6 +1321,7 @@ input[type=color]{width:34px;height:34px;padding:2px;border:1px solid var(--bord
           <button class="btn btn-xs btn-outline" onclick="hlTxtRescan(event)" title="只补未分配（空白）">文字重扫</button>
           <button class="btn btn-xs btn-outline" onclick="hlTxtRescanSelected(event)" title="只重扫选中格（会改写选中格的色号）">重扫选中</button>
           <button class="btn btn-xs btn-outline" onclick="hlTxtUndoRescan()">撤销重扫</button>
+          <button class="btn btn-xs btn-outline" onclick="hlRefineExportSelected()" title="导出选中格的原图截图（便于人工核对/发给我识别）">导出选中图</button>
           <span id="hlTxtStat" class="text-xs text-muted"></span>
         </div>
       </div>
@@ -1322,24 +1360,6 @@ input[type=color]{width:34px;height:34px;padding:2px;border:1px solid var(--bord
   </div>
 </div>
 
-<!-- Batch add analyze rows -->
-<div class="overlay" id="modalAnalyzeBatchAdd">
-  <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title">批量添加色号</span>
-      <button class="modal-close" onclick="closeModal('modalAnalyzeBatchAdd')">×</button>
-    </div>
-    <div class="modal-body">
-      <div class="text-xs text-muted" style="margin-bottom:8px">每行一个：色号 空格/Tab 数量，例如：A1 20</div>
-      <textarea id="analyzeBatchText" class="form-control" rows="10" style="font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono',monospace;font-size:12px"></textarea>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modalAnalyzeBatchAdd')">取消</button>
-      <button class="btn btn-primary" onclick="applyAnalyzeBatchAdd()">添加到结果</button>
-    </div>
-  </div>
-</div>
-
 <!-- Complete drawing confirm -->
 <div class="overlay" id="modalComplete">
   <div class="modal">
@@ -1370,6 +1390,11 @@ input[type=color]{width:34px;height:34px;padding:2px;border:1px solid var(--bord
 const IDB = (() => {
   const DB_NAME = 'pdgj_images', STORE = 'images', VERSION = 1;
   let _db = null;
+  function isQuotaError(e) {
+    const name = String(e && e.name || '');
+    const msg = String(e && e.message || '');
+    return name === 'QuotaExceededError' || name === 'NS_ERROR_DOM_QUOTA_REACHED' || /quota/i.test(msg);
+  }
   function open() {
     if (_db) return Promise.resolve(_db);
     return new Promise((res, rej) => {
@@ -1436,6 +1461,28 @@ const IDB = (() => {
         tx.onerror = e => rej(e.target.error);
       }));
     },
+    async putAllBestEffort(obj, onProgress) {
+      const entries = Object.entries(obj || {})
+        .sort((a, b) => {
+          const ap = String(a[0]).startsWith('thumb_') ? 0 : 1;
+          const bp = String(b[0]).startsWith('thumb_') ? 0 : 1;
+          return ap - bp;
+        });
+      let ok = 0, skipped = 0, failed = 0;
+      for (let i = 0; i < entries.length; i++) {
+        const [k, v] = entries[i];
+        try {
+          await this.put(k, v);
+          ok++;
+        } catch (e) {
+          if (isQuotaError(e)) skipped++;
+          else failed++;
+        }
+        if (onProgress) onProgress({ done: i + 1, total: entries.length, ok, skipped, failed });
+      }
+      return { ok, skipped, failed, total: entries.length };
+    },
+    isQuotaError,
     // Clear entire store
     clear() {
       return open().then(db => new Promise((res, rej) => {
@@ -1944,7 +1991,6 @@ function submitStock() {
   if (amount <= 0) { toast('请输入有效数量', 'error'); return; }
   const c = DB.getColor(id);
   if (!c) return;
-  if (dir === 'out' && c.stock < amount) { toast(`库存不足，当前仅有 ${c.stock} 颗`, 'error'); return; }
   const newStock = dir === 'in' ? c.stock + amount : c.stock - amount;
   DB.updateColor(id, { stock: newStock });
   toast(`${dir === 'in' ? '入库' : '出库'} ${amount} 颗，当前库存 ${newStock} 颗`, 'success');
@@ -1992,7 +2038,6 @@ function submitBatchStock() {
   for (const r of results) {
     if (!r.ok) { err++; continue; }
     const newStock = r.color.stock - r.amount;
-    if (newStock < 0) { err++; toast(`${r.color.code} 库存不足`, 'warn'); continue; }
     DB.updateColor(r.color.id, { stock: newStock });
     ok++;
   }
@@ -2035,9 +2080,9 @@ function bsiBuildList(filter) {
       <input type="number" min="0" placeholder="0" data-id="${c.id}"
         class="form-control bsi-qty" style="width:90px;height:28px;font-size:12px;text-align:right"
         oninput="bsiUpdateCounter()">
-      <button class="btn btn-xs btn-outline" onclick="bsiQuickAdd(this,'${c.id}',500)">+500</button>
       <button class="btn btn-xs btn-outline" onclick="bsiQuickAdd(this,'${c.id}',1000)">+1000</button>
-      <button class="btn btn-xs btn-outline" onclick="bsiQuickAdd(this,'${c.id}',1200)">+1200</button>
+      <button class="btn btn-xs btn-outline" onclick="bsiQuickAdd(this,'${c.id}',5000)">+5000</button>
+      <button class="btn btn-xs btn-outline" onclick="bsiQuickAdd(this,'${c.id}',10000)">+10000</button>
       <span style="font-size:11px;color:var(--muted);margin-left:auto">库存:${c.stock}</span>
     </div>`).join('');
   bsiUpdateCounter();
@@ -2162,7 +2207,7 @@ function submitBulkStock() {
     const amount = parseInt(el.value) || 0;
     const c = DB.getColor(id);
     if (!c || amount <= 0) return;
-    const newStock = dir === 'in' ? c.stock + amount : Math.max(0, c.stock - amount);
+    const newStock = dir === 'in' ? c.stock + amount : c.stock - amount;
     DB.updateColor(id, { stock: newStock });
   });
   toast(`批量${dir==='in'?'入库':'出库'}完成`, 'success');
@@ -2307,7 +2352,7 @@ function renderDrawingsGrid(opts = {}) {
       const can = scan && scan.colorMap;
       if (!can) return;
       const job = () => {
-        const pack = hlBuildPreviewPackFromScan(scan, { maxDim: 420, maxCell: 14, pad: 10, showGrid: true, showCodes: false });
+          const pack = hlBuildPreviewPackFromScan(scan, { maxDim: 420, maxCell: 14, pad: 10, showGrid: true, showCodes: false });
         if (!pack || !pack.url) return;
         apply(pack.url);
         DB.updateDrawing(d.id, { thumbnail: pack.url });
@@ -2335,12 +2380,10 @@ function handleDrawingUpload(input) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = e => {
-    compressImageData(e.target.result, 6000).then(compressed => {
-      pendingDrawingImage = compressed;
-      document.getElementById('drawingPreviewImg').src = compressed;
-      document.getElementById('drawingUploadPreview').style.display = 'block';
-      document.getElementById('drawingUploadZone').style.display = 'none';
-    });
+    pendingDrawingImage = e.target.result;
+    document.getElementById('drawingPreviewImg').src = pendingDrawingImage;
+    document.getElementById('drawingUploadPreview').style.display = 'block';
+    document.getElementById('drawingUploadZone').style.display = 'none';
   };
   reader.readAsDataURL(file);
 }
@@ -2450,8 +2493,8 @@ function renderDrawingDetail(id) {
       </div>
     </div>`;
 
-  // Async-load full image from IDB
-  DB.getDrawingImage(id).then(src => {
+  // Async-load full image from IDB. Light backups may only have a generated preview thumbnail.
+  DB.getDrawingImage(id).then(async src => {
     const wrap = document.getElementById('detailImgWrap');
     if (!wrap) return;
     if (src) {
@@ -2462,6 +2505,16 @@ function renderDrawingDetail(id) {
       wrap.innerHTML = '';
       wrap.appendChild(img);
     } else {
+      const thumb = await DB.getDrawingThumbnail(id).catch(() => null);
+      if (thumb) {
+        const img = document.createElement('img');
+        img.src = thumb;
+        img.style.cssText = 'width:100%;border-radius:8px;border:1px solid var(--border)';
+        img.alt = '图纸预览';
+        wrap.innerHTML = '<div class="text-xs text-muted" style="margin-bottom:6px">轻量备份未包含原图，当前显示手机预览图</div>';
+        wrap.appendChild(img);
+        return;
+      }
       const scan = d.hlScan;
       const canRebuild = (d.status === 'generated' || d.status === 'completed') && scan && scan.colorMap;
       if (canRebuild) {
@@ -2571,8 +2624,10 @@ function hlBuildPreviewPackFromScan(scan, opts) {
       ctx.restore();
     }
 
+    const mime = (opts && opts.mime) ? opts.mime : 'image/png';
+    const quality = (opts && typeof opts.quality === 'number') ? opts.quality : undefined;
     return {
-      url: cv.toDataURL('image/png'),
+      url: quality == null ? cv.toDataURL(mime) : cv.toDataURL(mime, quality),
       grid: { x: pad, y: pad, w: cols * cellSize, h: rows * cellSize, rows, cols },
       cellSize,
       pad,
@@ -2655,7 +2710,7 @@ function updateDrawingStatus(id, status) {
     for (const r of reqs) {
       const c = DB.getColor(r.colorId);
       if (!c) continue;
-      DB.updateColor(r.colorId, { stock: Math.max(0, c.stock - r.count) });
+      DB.updateColor(r.colorId, { stock: c.stock - r.count });
     }
     DB.updateDrawing(id, { status, completedAt: Date.now() });
     toast('状态已更新，库存已自动扣除', 'success');
@@ -2730,7 +2785,7 @@ function confirmComplete() {
   for (const r of reqs) {
     const c = DB.getColor(r.colorId);
     if (!c) continue;
-    DB.updateColor(r.colorId, { stock: Math.max(0, c.stock - r.count) });
+    DB.updateColor(r.colorId, { stock: c.stock - r.count });
   }
   DB.updateDrawing(id, { status: 'completed', completedAt: Date.now() });
   toast('图纸完成！库存已自动扣除', 'success');
@@ -2747,6 +2802,26 @@ function _codeSort(a, b) {
   const parse = s => { const m = String(s.code||'').toUpperCase().match(/^([A-Z]*)(\d*)(.*)$/); return [m[1]||'', parseInt(m[2])||0, m[3]||'']; };
   const [ap, an, as_] = parse(a), [bp, bn, bs] = parse(b);
   return ap !== bp ? ap.localeCompare(bp) : an !== bn ? an - bn : as_.localeCompare(bs);
+}
+let analyzeSortMode = 'code';
+function sortAnalyzeResults() {
+  if (!Array.isArray(analyzeResults)) return;
+  if (analyzeSortMode === 'count') {
+    analyzeResults.sort((a, b) => {
+      const ca = parseInt(a.count, 10) || 0;
+      const cb = parseInt(b.count, 10) || 0;
+      return cb !== ca ? cb - ca : _codeSort(a, b);
+    });
+  } else {
+    analyzeResults.sort(_codeSort);
+  }
+}
+function setAnalyzeSortMode(mode) {
+  analyzeSortMode = mode === 'count' ? 'count' : 'code';
+  const el = document.getElementById('analyzeSortMode');
+  if (el && el.value !== analyzeSortMode) el.value = analyzeSortMode;
+  sortAnalyzeResults();
+  renderAnalyzeResults();
 }
 let analyzeDrawingId = null;
 let canvasImg = null;
@@ -2778,9 +2853,10 @@ function initAnalyzeCanvas(drawingId) {
   }
   const gridCols = document.getElementById('analyzeGridCols');
   const gridRows = document.getElementById('analyzeGridRows');
-  gridCols.value = d.cols || 50;
-  gridRows.value = d.rows || 50;
+  if (gridCols) gridCols.value = d.cols || 50;
+  if (gridRows) gridRows.value = d.rows || 50;
   selection = null;
+  updateAnalyzeLegendPreview();
   analyzeResults = null;
   if (d.colorRequirements && d.colorRequirements.length) {
     analyzeResults = d.colorRequirements
@@ -2790,9 +2866,10 @@ function initAnalyzeCanvas(drawingId) {
         return { id: r.colorId, code, count: r.count || 0, color };
       })
       .sort(_codeSort);
+    sortAnalyzeResults();
     renderAnalyzeResults();
   } else {
-    document.getElementById('analyzeResult').innerHTML = '<div class="text-sm text-muted" style="padding:20px;text-align:center">框选色号汇总区域后点击「OCR识别汇总」</div>';
+    document.getElementById('analyzeResult').innerHTML = '<div class="text-sm text-muted" style="padding:20px;text-align:center">框选色号汇总区域后点击「本地模型识别图例」</div>';
     document.getElementById('analyzeTotal').textContent = '';
   }
   setTool('ocr'); // default to OCR mode
@@ -2820,6 +2897,7 @@ function initAnalyzeCanvas(drawingId) {
       canvas.height = img.height;
       canvasScale = 1;
       drawCanvas();
+      updateAnalyzeLegendPreview();
     };
     img.src = imgSrc;
   });
@@ -2884,15 +2962,87 @@ function _isTextInputTarget(e) {
   return !!t.isContentEditable;
 }
 
+function _wheelDeltaPx(e) {
+  const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? window.innerHeight : 1;
+  return { x: e.deltaX * unit, y: e.deltaY * unit };
+}
+
+function _findScrollableParent(el, axis) {
+  let n = el;
+  while (n && n !== document.body && n !== document.documentElement) {
+    const style = getComputedStyle(n);
+    if (axis === 'x') {
+      const ox = style.overflowX;
+      if ((ox === 'auto' || ox === 'scroll') && n.scrollWidth > n.clientWidth + 1) return n;
+    } else {
+      const oy = style.overflowY;
+      if ((oy === 'auto' || oy === 'scroll') && n.scrollHeight > n.clientHeight + 1) return n;
+    }
+    n = n.parentElement;
+  }
+  return document.scrollingElement || document.documentElement;
+}
+
+function _handleShiftWheelScroll(e, fallback) {
+  if (!e.shiftKey || e.ctrlKey || e.metaKey) return false;
+  const d = _wheelDeltaPx(e);
+  const amount = Math.abs(d.y) >= Math.abs(d.x) ? d.y : d.x;
+  const scroller = _findScrollableParent(e.target, 'x');
+  if (scroller && scroller.scrollWidth > scroller.clientWidth + 1) {
+    scroller.scrollLeft += amount;
+    e.preventDefault();
+    return true;
+  }
+  if (typeof fallback === 'function') {
+    fallback(amount);
+    e.preventDefault();
+    return true;
+  }
+  return false;
+}
+
 function setTool(t) {
-  analyzeTool = t;
-  document.getElementById('toolOCR').classList.toggle('active', t==='ocr');
-  document.getElementById('toolRect').classList.toggle('active', t==='rect');
-  document.getElementById('ocrControls').style.cssText = t==='ocr' ? 'display:flex' : 'display:none';
-  document.getElementById('gridControls').style.cssText = t==='rect' ? 'display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px' : 'display:none';
-  document.getElementById('canvasHint').textContent = t==='ocr'
-    ? '拖拽框选色号汇总区域 · 空格+左键平移'
-    : '拖拽框选要取样的豆子区域 · 空格+左键平移';
+  analyzeTool = 'ocr';
+  const toolOCR = document.getElementById('toolOCR');
+  const ocrControls = document.getElementById('ocrControls');
+  const canvasHint = document.getElementById('canvasHint');
+  if (toolOCR) toolOCR.classList.add('active');
+  if (ocrControls) ocrControls.style.cssText = 'display:flex';
+  if (canvasHint) canvasHint.textContent = '拖拽框选色号汇总区域 · Cmd/Ctrl+滚轮缩放 · Shift+滚轮横移 · 空格+左键平移';
+}
+
+function analyzeScrollToBottom() {
+  const pane = document.getElementById('analyzeLeftPane');
+  if (!pane) return;
+  pane.scrollTop = Math.max(0, pane.scrollHeight - pane.clientHeight);
+}
+
+function updateAnalyzeLegendPreview() {
+  const wrap = document.getElementById('analyzeLegendPreview');
+  if (!wrap) return;
+  const body = wrap.querySelector('.analyze-preview-body');
+  if (!body) return;
+  if (!canvasImg || !selection || selection.w < 10 || selection.h < 10) {
+    body.innerHTML = '<div class="analyze-preview-empty">框选底部图例后，这里会显示放大预览，方便和识别结果对照。</div>';
+    return;
+  }
+  const rx = Math.max(0, Math.round(selection.x));
+  const ry = Math.max(0, Math.round(selection.y));
+  const rw = Math.min(Math.round(selection.w), canvasImg.width - rx);
+  const rh = Math.min(Math.round(selection.h), canvasImg.height - ry);
+  if (rw < 2 || rh < 2) {
+    body.innerHTML = '<div class="analyze-preview-empty">框选区域太小，请重新框选图例。</div>';
+    return;
+  }
+  const scale = Math.min(2.5, Math.max(1, 1200 / Math.max(1, rw)));
+  const c = document.createElement('canvas');
+  c.width = Math.max(2, Math.round(rw * scale));
+  c.height = Math.max(2, Math.round(rh * scale));
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(canvasImg, rx, ry, rw, rh, 0, 0, c.width, c.height);
+  body.innerHTML = `<img alt="框选图例预览" src="${c.toDataURL('image/jpeg', 0.92)}">`;
 }
 
 function getCanvasPos(e) {
@@ -2952,14 +3102,33 @@ function onCanvasMouseUp(e) {
     return;
   }
   isSelecting = false;
+  updateAnalyzeLegendPreview();
 }
 function onCanvasWheel(e) {
+  if (_handleShiftWheelScroll(e, amount => {
+    canvasOffset.x -= amount / Math.max(0.1, canvasScale);
+    drawCanvas();
+  })) return;
+  if (!(e.ctrlKey || e.metaKey)) return;
   e.preventDefault();
-  const delta = e.deltaY > 0 ? -0.1 : 0.1;
-  zoomCanvas(delta);
+  zoomCanvasAt(e, e.deltaY < 0 ? 1.12 : 1 / 1.12);
 }
 function zoomCanvas(delta) {
   canvasScale = Math.max(0.1, Math.min(5, canvasScale + delta));
+  document.getElementById('zoomLabel').textContent = Math.round(canvasScale * 100) + '%';
+  drawCanvas();
+}
+function zoomCanvasAt(e, factor) {
+  if (!canvasImg) return;
+  const canvas = document.getElementById('analyzeCanvas');
+  const rect = canvas.getBoundingClientRect();
+  const scrX = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const scrY = (e.clientY - rect.top) * (canvas.height / rect.height);
+  const imgX = scrX / canvasScale - canvasOffset.x;
+  const imgY = scrY / canvasScale - canvasOffset.y;
+  canvasScale = Math.max(0.1, Math.min(5, canvasScale * factor));
+  canvasOffset.x = scrX / canvasScale - imgX;
+  canvasOffset.y = scrY / canvasScale - imgY;
   document.getElementById('zoomLabel').textContent = Math.round(canvasScale * 100) + '%';
   drawCanvas();
 }
@@ -3008,6 +3177,7 @@ function drawCanvas() {
 function clearSelection() {
   selection = null;
   drawCanvas();
+  updateAnalyzeLegendPreview();
 }
 
 // ── BAIDU OCR ────────────────────────────────
@@ -3077,11 +3247,131 @@ async function testBaiduOCR() {
 function updateOCREngineLabel() {
   const el = document.getElementById('ocrEngineLabel');
   if (!el) return;
-  const cfg = getBaiduConfig();
-  el.textContent = cfg.accessToken ? '引擎：百度OCR（高精度）' : '引擎：本地Tesseract';
+  el.textContent = '';
+  el.style.display = 'none';
+}
+
+const LOCAL_MODEL_BASE_URL = 'http://127.0.0.1:5055';
+async function _localModelFetchJson(path, payload, timeoutMs = 25000) {
+  const base = LOCAL_MODEL_BASE_URL;
+  const url = base + path;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload || {}),
+      signal: ctrl.signal
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d && d.error ? d.error : `HTTP ${r.status}`);
+    if (d && d.error) throw new Error(d.error);
+    return d;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+function _analyzeGetSelectionDataUrl(scale = 2) {
+  if (!canvasImg || !selection || selection.w < 10 || selection.h < 10) return null;
+  const rx = Math.max(0, Math.round(selection.x));
+  const ry = Math.max(0, Math.round(selection.y));
+  const rw = Math.min(Math.round(selection.w), canvasImg.width - rx);
+  const rh = Math.min(Math.round(selection.h), canvasImg.height - ry);
+  if (rw < 2 || rh < 2) return null;
+  const c = document.createElement('canvas');
+  c.width = Math.max(2, Math.round(rw * scale));
+  c.height = Math.max(2, Math.round(rh * scale));
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(canvasImg, rx, ry, rw, rh, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.92);
+}
+
+async function localLegendAnalyze() {
+  return runLegendAnalyzeWithEndpoint({
+    path: '/legend',
+    scale: 1.5,
+    timeoutMs: 120000,
+    loadingText: '本地模型识别中…',
+    successPrefix: '本地模型识别完成',
+    failurePrefix: '本地模型识别失败'
+  });
+}
+
+async function glmLegendAnalyze() {
+  return runLegendAnalyzeWithEndpoint({
+    path: '/legend-glm',
+    scale: 2,
+    timeoutMs: 300000,
+    loadingText: 'GLM 识别图例中…',
+    successPrefix: 'GLM识别完成',
+    failurePrefix: 'GLM识别失败'
+  });
+}
+
+async function runLegendAnalyzeWithEndpoint(opts) {
+  if (!canvasImg) { toast('请先上传图纸图片', 'warn'); return; }
+  if (!selection || selection.w < 10 || selection.h < 10) {
+    toast('请先框选图纸底部的图例区域', 'warn'); return;
+  }
+  const img = _analyzeGetSelectionDataUrl(opts.scale || 1.5);
+  if (!img) { toast('框选区域无效', 'warn'); return; }
+  const resultEl = document.getElementById('analyzeResult');
+  const totalEl = document.getElementById('analyzeTotal');
+  resultEl.innerHTML = `<div style="text-align:center;padding:28px"><div class="spinner"></div><div class="text-sm text-muted mt-3">${esc(opts.loadingText || '识别中…')}</div></div>`;
+  totalEl.textContent = '';
+  try {
+    const allDBColors = DB.getColors();
+    const validCodes = allDBColors
+      .filter(c => {
+        if (colorSetMode === '221') return COLOR_SET_221.has(c.code.replace(/\d/g,'').toUpperCase());
+        return true;
+      })
+      .map(c => c.code.toUpperCase());
+    const validColors = allDBColors
+      .filter(c => validCodes.includes(c.code.toUpperCase()))
+      .map(c => ({ code: c.code.toUpperCase(), hex: c.hex }));
+    const d = await _localModelFetchJson(opts.path || '/legend', { image: img, validCodes, validColors }, opts.timeoutMs || 120000);
+    const items0 = Array.isArray(d) ? d : (Array.isArray(d.items) ? d.items : []);
+    const merged = {};
+    for (const it of items0) {
+      const code0 = (it && it.code) ? _hlNormBeadCode(String(it.code).toUpperCase()) : '';
+      const cnt = parseInt(it && it.count != null ? it.count : it && it.qty != null ? it.qty : 0, 10) || 0;
+      if (!code0 || cnt <= 0) continue;
+      merged[code0] = Math.max(merged[code0] || 0, cnt);
+    }
+    const colors = DB.getColors();
+    const finalResults = Object.entries(merged).map(([code, count]) => {
+      const color = colors.find(c => c.code.toLowerCase() === code.toLowerCase());
+      return { code, count, color };
+    }).sort(_codeSort);
+    if (!finalResults.length) {
+      resultEl.innerHTML = '<div style="padding:16px"><div class="text-sm" style="color:var(--danger);margin-bottom:8px">未识别出色号，请检查框选区域是否包含完整图例。</div></div>';
+      return;
+    }
+    if (!analyzeResults) analyzeResults = [];
+    for (const r of finalResults) {
+      const existing = analyzeResults.find(e => e.code.toUpperCase() === r.code.toUpperCase());
+      if (existing) existing.count = Math.max(parseInt(existing.count, 10) || 0, r.count);
+      else analyzeResults.push({ id: r.color?.id, code: r.code, count: r.count, color: r.color });
+    }
+    sortAnalyzeResults();
+    analyzeResults = analyzeResults.filter(e => (parseInt(e.count, 10) || 0) > 0);
+    renderAnalyzeResults();
+    toast(`${opts.successPrefix || '识别完成'}：${finalResults.length} 个色号`, 'success');
+  } catch (e) {
+    const isAbort = e && (e.name === 'AbortError' || /aborted|abort/i.test(String(e.message || e)));
+    const msg = isAbort
+      ? '识别超时：这张图例色号较多，模型处理时间超过限制。请缩小框选到纯图例区域后重试。'
+      : `${opts.failurePrefix || '识别失败'}：${esc(e && e.message ? e.message : e)}`;
+    resultEl.innerHTML = `<div style="padding:16px"><div class="text-sm" style="color:var(--danger);margin-bottom:8px">${msg}</div></div>`;
+  }
 }
 function hasBaiduConfig() {
-  return !!getBaiduConfig().accessToken;
+  return false;
 }
 async function _getBaiduToken() {
   const cfg = getBaiduConfig();
@@ -3584,7 +3874,7 @@ async function doOCRAnalyze() {
       if (existing) existing.count += r.count;
       else analyzeResults.push({ id: r.color?.id, code: r.code, count: r.count, color: r.color });
     }
-    analyzeResults.sort(_codeSort);
+    sortAnalyzeResults();
     analyzeResults = analyzeResults.filter(e => (parseInt(e.count, 10) || 0) > 0);
 
     renderAnalyzeResults();
@@ -3752,6 +4042,7 @@ let hlScanColors = [];
 let hlAllowedCodes = null;
 let hlUseTxtAssist = false;
 let hlTxtDropUnmatched = false;
+let hlTxtSelectedRescanBaseline = null;
 let hlRefineCells = null;
 let hlOutDataUrl = null;
 let hlOutMeta = null;
@@ -3806,6 +4097,7 @@ const HL_TXT_KEY = 'pdgj_hl_txt_model_v1';
 const HL_TXT_DROP_KEY = 'pdgj_hl_txt_drop_unmatched';
 let hlTxtModel = null;
 let hlTxtLastColorMap = null;
+let hlAiLastScan = null;
 
 const _hlTxtPop = (() => {
   const a = new Uint8Array(256);
@@ -3929,18 +4221,22 @@ function _hlTxtExtractBinFromCell(wbData, x0, y0, x1, y1, iw, W, H) {
       const r = wbData.data[i], g = wbData.data[i + 1], b = wbData.data[i + 2];
       const mx = Math.max(r, g, b);
       const mn = Math.min(r, g, b);
-      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      let lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      let mn2 = mn;
+      const isMag = (r > 150 && b > 150 && (g + 45) < Math.min(r, b));
+      const isRed = (r > 170 && (r - g) > 70 && (r - b) > 50 && g < 150 && b < 150);
+      if (isMag || isRed) { lum = 245; mn2 = 245; }
       const idx = yy * W + xx;
       lumArr[idx] = lum;
       darkArr[idx] = 255 - mx;
-      whiteArr[idx] = mn;
+      whiteArr[idx] = mn2;
       if (lum < minLum) minLum = lum;
       if (lum > maxLum) maxLum = lum;
       const dv = 255 - mx;
       if (dv < minDark) minDark = dv;
       if (dv > maxDark) maxDark = dv;
-      if (mn < minWhite) minWhite = mn;
-      if (mn > maxWhite) maxWhite = mn;
+      if (mn2 < minWhite) minWhite = mn2;
+      if (mn2 > maxWhite) maxWhite = mn2;
     }
   }
   const rawRangeLum = maxLum - minLum;
@@ -4073,6 +4369,86 @@ function _hlTxtJaccardPacked(a, b) {
   return uni ? inter / uni : 0;
 }
 
+function _hlTxtJaccardPackedXRange(a, b, W, H, x0, x1) {
+  x0 = Math.max(0, Math.min(W, x0 | 0));
+  x1 = Math.max(0, Math.min(W, x1 | 0));
+  if (x1 <= x0) return 0;
+  let inter = 0, uni = 0;
+  for (let y = 0; y < H; y++) {
+    const rowBase = y * W;
+    for (let x = x0; x < x1; x++) {
+      const idx = rowBase + x;
+      const ma = a[idx >> 3] & (1 << (idx & 7));
+      const mb = b[idx >> 3] & (1 << (idx & 7));
+      if (ma & mb) inter++;
+      if (ma | mb) uni++;
+    }
+  }
+  return uni ? (inter / uni) : 0;
+}
+
+function _hlTxtBestTplScore(bin, arr) {
+  let bestS = 0, bestT = null;
+  for (const t of arr || []) {
+    const ss = _hlTxtJaccardPacked(bin, t);
+    if (ss > bestS) { bestS = ss; bestT = t; }
+  }
+  return { bestS, bestT };
+}
+function _hlTxtBestScoreForCode(bin, code, dec) {
+  const arr = dec?.[code] || null;
+  if (!arr || !arr.length) return { bestS: 0, bestT: null };
+  return _hlTxtBestTplScore(bin, arr);
+}
+
+function _hlTxtTieBreakByRegions(bin, W, H, bestCode, bestS, secondCode, secondS, dec) {
+  if (!bestCode || !secondCode) return null;
+  if (!(bestS > 0 && secondS > 0)) return null;
+  if ((bestS - secondS) > 0.14) return null;
+  const a = _hlTxtParseCodeParts(bestCode);
+  const b = _hlTxtParseCodeParts(secondCode);
+  if (!a || !b) return null;
+  const aArr = dec?.[bestCode] || null;
+  const bArr = dec?.[secondCode] || null;
+  if (!aArr?.length || !bArr?.length) return null;
+  const aa = _hlTxtBestTplScore(bin, aArr);
+  const bb = _hlTxtBestTplScore(bin, bArr);
+  if (!aa.bestT || !bb.bestT) return null;
+  const split = Math.max(8, Math.min(W - 8, Math.round(W * 0.58)));
+  const al = _hlTxtJaccardPackedXRange(bin, aa.bestT, W, H, 0, split);
+  const bl = _hlTxtJaccardPackedXRange(bin, bb.bestT, W, H, 0, split);
+  const ar = _hlTxtJaccardPackedXRange(bin, aa.bestT, W, H, split, W);
+  const br = _hlTxtJaccardPackedXRange(bin, bb.bestT, W, H, split, W);
+  if (a.p !== b.p && Math.abs(al - bl) >= 0.06) return (al > bl) ? bestCode : secondCode;
+  if (a.n !== b.n && Math.abs(ar - br) >= 0.06) return (ar > br) ? bestCode : secondCode;
+  return null;
+}
+
+function _hlTxtTieBreakPlusTenByTpl(bin, W, H, bestCode, bestS, secondCode, secondS, dec) {
+  if (!bestCode || !secondCode) return null;
+  if (!(bestS > 0 && secondS > 0)) return null;
+  if ((bestS - secondS) > 0.18) return null;
+  const a = _hlTxtParseCodeParts(bestCode);
+  const b = _hlTxtParseCodeParts(secondCode);
+  if (!a || !b) return null;
+  if (a.p !== b.p) return null;
+  const small = Math.min(a.n, b.n);
+  const big = Math.max(a.n, b.n);
+  if (big !== (small + 10)) return null;
+  const aArr = dec?.[bestCode] || null;
+  const bArr = dec?.[secondCode] || null;
+  if (!aArr?.length || !bArr?.length) return null;
+  const aa = _hlTxtBestTplScore(bin, aArr);
+  const bb = _hlTxtBestTplScore(bin, bArr);
+  if (!aa.bestT || !bb.bestT) return null;
+  const x0 = Math.max(0, Math.min(W - 1, Math.round(W * 0.40)));
+  const x1 = Math.max(x0 + 1, Math.min(W, Math.round(W * 0.62)));
+  const sa = _hlTxtJaccardPackedXRange(bin, aa.bestT, W, H, x0, x1);
+  const sb = _hlTxtJaccardPackedXRange(bin, bb.bestT, W, H, x0, x1);
+  if (Math.abs(sa - sb) >= 0.05) return (sa > sb) ? bestCode : secondCode;
+  return null;
+}
+
 function _hlTxtParseCodeParts(code) {
   const m = /^([A-Z]{1,3})(\d{1,3})$/.exec((code || '').toUpperCase());
   if (!m) return null;
@@ -4096,6 +4472,22 @@ function _hlTxtPackedRegionRatio(packed, W, H, x0, x1) {
   }
   return total ? (black / total) : 0;
 }
+function _hlTxtPackedMaxColRatio(packed, W, H, x0, x1) {
+  x0 = Math.max(0, Math.min(W, x0 | 0));
+  x1 = Math.max(0, Math.min(W, x1 | 0));
+  if (x1 <= x0) return 0;
+  let best = 0;
+  for (let x = x0; x < x1; x++) {
+    let c = 0;
+    for (let y = 0; y < H; y++) {
+      const idx = y * W + x;
+      const b = packed[idx >> 3] & (1 << (idx & 7));
+      if (b) c++;
+    }
+    if (c > best) best = c;
+  }
+  return H ? (best / H) : 0;
+}
 function _hlTxtTieBreakLeadingOne(packed, W, H, bestCode, bestS, secondCode, secondS) {
   if (!bestCode || !secondCode) return null;
   if (!(bestS > 0 && secondS > 0)) return null;
@@ -4107,8 +4499,14 @@ function _hlTxtTieBreakLeadingOne(packed, W, H, bestCode, bestS, secondCode, sec
   const small = Math.min(a.n, b.n);
   const big = Math.max(a.n, b.n);
   if (big !== (small + 10)) return null;
-  const left = _hlTxtPackedRegionRatio(packed, W, H, 0, Math.max(1, Math.round(W * 0.28)));
-  const preferBig = left >= 0.040;
+  const leftGlobal = _hlTxtPackedRegionRatio(packed, W, H, 0, Math.max(1, Math.round(W * 0.28)));
+  const digitStart = Math.max(0, Math.min(W - 1, Math.round(W * 0.40)));
+  const digitBandW = Math.max(1, Math.round(W * 0.28));
+  const leftDigit = _hlTxtPackedRegionRatio(packed, W, H, digitStart, Math.min(W, digitStart + digitBandW));
+  const cue = Math.max(leftGlobal, leftDigit);
+  const maxLeft = _hlTxtPackedMaxColRatio(packed, W, H, 0, Math.max(1, Math.round(W * 0.30)));
+  const maxDigit = _hlTxtPackedMaxColRatio(packed, W, H, digitStart, Math.min(W, digitStart + digitBandW));
+  const preferBig = (maxLeft >= 0.42) || (maxDigit >= 0.42) || (cue >= 0.026);
   const want = preferBig ? (a.n === big ? bestCode : secondCode) : (a.n === small ? bestCode : secondCode);
   return want;
 }
@@ -4198,8 +4596,9 @@ function hlTxtTrainSelected(ev) {
   hlTxtSaveModel();
   hlTxtUpdateStat();
   const after = existed + added;
-  toast(`训练：${code} 选中${ids.length}·写入${added}·跳过${bad}（样本${after}/${cap}）`, added ? 'success' : 'warn');
-  hlRefineSelNone();
+  toast(`训练：${code} 选中${ids.length}·写入${added}·跳过${bad}（样本${after}/${cap}，选中已保留，可直接重扫）`, added ? 'success' : 'warn');
+  hlRefineUpdateSelInfo();
+  hlRefineRender();
 }
 
 function hlTxtUndoRescan() {
@@ -4207,6 +4606,7 @@ function hlTxtUndoRescan() {
   if (!hlTxtLastColorMap) { toast('没有可撤销的重扫结果', 'warn'); return; }
   hlColorMap = hlTxtLastColorMap;
   hlTxtLastColorMap = null;
+  hlTxtSelectedRescanBaseline = null;
   _hlRebuildDetected();
   hlAutoSaveScan();
   renderHlPalette();
@@ -4216,6 +4616,36 @@ function hlTxtUndoRescan() {
   toast('已撤销上一次文字重扫', 'success');
 }
 
+function _hlCloneColorMap(map) {
+  return Array.isArray(map) ? map.map(row => Array.isArray(row) ? row.slice() : []) : null;
+}
+
+function _hlTxtModelSignature() {
+  const m = hlTxtLoadModel();
+  const parts = [];
+  for (const src of ['base', 'samples']) {
+    const obj = m && m[src] ? m[src] : {};
+    for (const [code, arr] of Object.entries(obj)) {
+      parts.push(`${src}:${code}:${Array.isArray(arr) ? arr.length : 0}`);
+    }
+  }
+  return parts.sort().join('|');
+}
+
+function _hlTxtSelectedRescanKey() {
+  if (!hlRefineState.selected || !hlRefineState.selected.size || !hlGrid) return '';
+  const ids = Array.from(hlRefineState.selected).filter(Number.isFinite).sort((a, b) => a - b).join(',');
+  return [
+    hlDrawingId || '',
+    hlGrid.rows || 0,
+    hlGrid.cols || 0,
+    String(hlRefineState.group || '').toUpperCase(),
+    hlTxtDropUnmatched ? 'drop' : 'keep',
+    _hlTxtModelSignature(),
+    ids
+  ].join('::');
+}
+
 function hlTxtRescanSelected(ev) {
   if (!hlRefineState.open) { toast('请先进入 Step3 微调界面', 'warn'); return; }
   if (!hlRefineState.selected || !hlRefineState.selected.size) {
@@ -4223,6 +4653,43 @@ function hlTxtRescanSelected(ev) {
     return;
   }
   hlTxtRescan({ shiftKey: true, altKey: !!(ev && ev.altKey) });
+}
+
+function _hlTxtBuildColorProtosFromMap(wbData, iw, rows, cols, cw, ch, colorMap, ignoreMap, codes) {
+  const codeSet = codes ? new Set(codes) : null;
+  const capPerCode = 24;
+  const minPerCode = 4;
+  const used = new Map();
+  const sum = new Map();
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (ignoreMap && ignoreMap[r] && ignoreMap[r][c]) continue;
+      const raw = colorMap?.[r]?.[c] ? String(colorMap[r][c]).toUpperCase() : '';
+      if (!raw) continue;
+      const code = _hlNormBeadCode(raw);
+      if (!code) continue;
+      if (codeSet && !codeSet.has(code)) continue;
+      const k = code;
+      const n0 = used.get(k) || 0;
+      if (n0 >= capPerCode) continue;
+      const x0 = Math.round(c * cw), y0 = Math.round(r * ch);
+      const x1 = Math.min(Math.round((c + 1) * cw), iw);
+      const y1 = Math.min(Math.round((r + 1) * ch), wbData.height);
+      const lab = _hlSampleCellBgLab(wbData, x0, y0, x1, y1, iw);
+      if (!lab) continue;
+      let s = sum.get(k);
+      if (!s) { s = [0, 0, 0, 0]; sum.set(k, s); }
+      s[0] += lab[0]; s[1] += lab[1]; s[2] += lab[2]; s[3] += 1;
+      used.set(k, n0 + 1);
+    }
+  }
+  const out = new Map();
+  for (const [k, s] of sum.entries()) {
+    const n = s[3] || 0;
+    if (n < minPerCode) continue;
+    out.set(k, [s[0] / n, s[1] / n, s[2] / n]);
+  }
+  return out;
 }
 
 function hlTxtRescan(ev) {
@@ -4235,8 +4702,7 @@ function hlTxtRescan(ev) {
   }
   if (!hlTxtModel._dec) hlTxtLoadModel();
   const allowed = _hlTxtGetAllowedCodes();
-  const codes = Object.keys(hlTxtModel._dec || {}).filter(c => !allowed || allowed.has(c));
-  if (!codes.length) { toast('没有可用的字形模板（请先训练/或检查色号需求）', 'warn'); return; }
+  const modelCodes = Object.keys(hlTxtModel._dec || {});
   const offWB = document.createElement('canvas');
   offWB.width = Math.round(hlGrid.w); offWB.height = Math.round(hlGrid.h);
   offWB.getContext('2d').drawImage(hlImg, hlGrid.x, hlGrid.y, hlGrid.w, hlGrid.h, 0, 0, offWB.width, offWB.height);
@@ -4245,16 +4711,45 @@ function hlTxtRescan(ev) {
   const cols = hlGrid.cols, rows = hlGrid.rows;
   const cw = offWB.width / cols, ch = offWB.height / rows;
   const W = hlTxtModel.W || 40, H = hlTxtModel.H || 40;
-  const wantSelected = !!(ev && ev.shiftKey);
+  const wantSelected = !!(ev && ev.shiftKey) || !!(hlRefineState.selected && hlRefineState.selected.size);
   const onlySelected = wantSelected && hlRefineState.selected && hlRefineState.selected.size;
   const selSet = onlySelected ? new Set(Array.from(hlRefineState.selected)) : null;
-  if (!onlySelected && hlRefineState.selected && hlRefineState.selected.size) {
-    toast(`已选中${hlRefineState.selected.size}格：当前「文字重扫」只补未分配；要重扫选中格请点「重扫选中」`, 'warn');
+  const gk = onlySelected ? String(hlRefineState.group || '').toUpperCase() : '';
+  const groupCode = (gk && !gk.startsWith('__')) ? _hlNormBeadCode(gk) : '';
+  const inputCode = _hlNormBeadCode((document.getElementById('hlRefineAssignInput')?.value || '').toUpperCase());
+  const trainedCodes = new Set(Object.keys(hlTxtModel.samples || {}).filter(c => Array.isArray(hlTxtModel.samples[c]) && hlTxtModel.samples[c].length));
+  let codes = modelCodes.filter(c => !allowed || allowed.has(c));
+  if (onlySelected) {
+    const expanded = new Set(codes);
+    for (const c of trainedCodes) expanded.add(c);
+    if (inputCode) expanded.add(inputCode);
+    if (groupCode) expanded.add(groupCode);
+    codes = modelCodes.filter(c => expanded.has(c));
   }
+  if (!codes.length) { toast('没有可用的字形模板（请先训练/或检查色号需求）', 'warn'); return; }
+  const force = !!(ev && ev.altKey);
+  let sourceColorMap = hlColorMap;
+  if (onlySelected) {
+    const key = _hlTxtSelectedRescanKey();
+    if (!hlTxtSelectedRescanBaseline || hlTxtSelectedRescanBaseline.key !== key) {
+      hlTxtSelectedRescanBaseline = { key, colorMap: _hlCloneColorMap(hlColorMap) };
+    }
+    sourceColorMap = hlTxtSelectedRescanBaseline.colorMap || hlColorMap;
+  } else {
+    hlTxtSelectedRescanBaseline = null;
+  }
+  const proto = _hlTxtBuildColorProtosFromMap(wbData, iw, rows, cols, cw, ch, sourceColorMap, hlIgnoreMap, codes);
+  const codeLabCache = new Map();
+  for (const code of codes) codeLabCache.set(code, proto.get(code) || _hlGetLabByCode(code));
   let updated = 0;
   let extracted = 0;
   let confident = 0;
   let dropped = 0;
+  let binFailed = 0;
+  let duel = 0;
+  let duelForced = 0;
+  let duelPlusTen = 0;
+  let duelColor = 0;
   const before = hlColorMap.map(row => row.slice());
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -4270,6 +4765,7 @@ function hlTxtRescan(ev) {
       const y1 = Math.min(Math.round((r + 1) * ch), offWB.height);
       const bin = _hlTxtExtractBinFromCell(wbData, x0, y0, x1, y1, iw, W, H);
       if (!bin) {
+        binFailed++;
         if (onlySelected && hlTxtDropUnmatched && hlColorMap[r][c]) {
           hlColorMap[r][c] = null;
           updated++;
@@ -4278,8 +4774,72 @@ function hlTxtRescan(ev) {
         continue;
       }
       extracted++;
+      if (onlySelected && force && groupCode) {
+        const cur0 = sourceColorMap?.[r]?.[c] ? String(sourceColorMap[r][c]).toUpperCase() : '';
+        const curCode = cur0 ? _hlNormBeadCode(cur0) : '';
+        if (curCode && curCode !== groupCode) {
+          duel++;
+          const gS = _hlTxtBestScoreForCode(bin, groupCode, hlTxtModel._dec).bestS;
+          const cS = _hlTxtBestScoreForCode(bin, curCode, hlTxtModel._dec).bestS;
+          const cellLab = _hlSampleCellBgLab(wbData, x0, y0, x1, y1, iw);
+          const gD = _hlLabDist(cellLab, proto.get(groupCode) || _hlGetLabByCode(groupCode));
+          const cD = _hlLabDist(cellLab, proto.get(curCode) || _hlGetLabByCode(curCode));
+          const colorOk = Number.isFinite(gD) && Number.isFinite(cD) && (gD + 6) < cD && gD <= 32;
+          let plusTenOk = false;
+          {
+            const a = _hlTxtParseCodeParts(groupCode);
+            const b = _hlTxtParseCodeParts(curCode);
+            if (a && b && a.p === b.p && Math.abs(a.n - b.n) === 10) {
+              const pick = _hlTxtTieBreakLeadingOne(bin, W, H, groupCode, 0.50, curCode, 0.49);
+              if (pick === groupCode) plusTenOk = true;
+              const pick2 = _hlTxtTieBreakPlusTenByTpl(bin, W, H, groupCode, gS, curCode, cS, hlTxtModel._dec);
+              if (pick2 === groupCode) plusTenOk = true;
+            }
+          }
+          const pass = !force
+            ? ((gS >= 0.18 && (gS >= cS + 0.03)) || (gS >= 0.20 && colorOk) || (plusTenOk && (gS >= 0.12 || colorOk)))
+            : ((gS >= 0.14 && (gS >= cS)) || (gS >= 0.16 && colorOk) || (plusTenOk && (gS >= 0.08 || colorOk)));
+          if (pass) {
+            hlColorMap[r][c] = groupCode;
+            updated++;
+            confident++;
+            duelForced++;
+            if (plusTenOk) duelPlusTen++;
+            if (colorOk) duelColor++;
+            continue;
+          }
+        }
+      }
+      let cellLab = null;
+      let candCodes = codes;
+      if (!onlySelected && codes.length > 18) {
+        cellLab = _hlSampleCellBgLab(wbData, x0, y0, x1, y1, iw);
+        const rank = [];
+        for (const code of codes) {
+          const lab = codeLabCache.get(code) || _hlGetLabByCode(code);
+          const d = _hlLabDist(cellLab, lab);
+          if (!Number.isFinite(d)) continue;
+          rank.push([d, code]);
+        }
+        rank.sort((a, b) => a[0] - b[0]);
+        const topK = 16;
+        const maxD = 42;
+        let cc = rank.filter(x => x[0] <= maxD).slice(0, topK).map(x => x[1]);
+        if (cc.length < Math.min(6, Math.min(topK, rank.length))) cc = rank.slice(0, topK).map(x => x[1]);
+        if (cc.length) candCodes = cc;
+      }
+      if (onlySelected) candCodes = codes;
+      else if (groupCode) candCodes = Array.from(new Set([...candCodes, groupCode]));
+      if (onlySelected && inputCode && hlTxtModel._dec?.[inputCode]?.length) {
+        candCodes = Array.from(new Set([inputCode, ...candCodes]));
+      }
+      {
+        const cur0 = sourceColorMap?.[r]?.[c] ? String(sourceColorMap[r][c]).toUpperCase() : '';
+        const curN = cur0 ? _hlNormBeadCode(cur0) : '';
+        if (curN && (!allowed || allowed.has(curN))) candCodes = Array.from(new Set([...candCodes, curN]));
+      }
       let best = null, bestS = 0, second = 0, secondCode = null;
-      for (const code of codes) {
+      for (const code of candCodes) {
         const arr = hlTxtModel._dec?.[code] || null;
         if (!arr || !arr.length) continue;
         let s = 0;
@@ -4295,31 +4855,45 @@ function hlTxtRescan(ev) {
         const tS = bestS; bestS = second; second = tS;
         const tC = best; best = secondCode; secondCode = tC;
       }
+      {
+        const tb10 = _hlTxtTieBreakPlusTenByTpl(bin, W, H, best, bestS, secondCode, second, hlTxtModel._dec);
+        if (tb10 && tb10 !== best && tb10 === secondCode) {
+          const tS = bestS; bestS = second; second = tS;
+          const tC = best; best = secondCode; secondCode = tC;
+        }
+      }
+      {
+        const tb2 = _hlTxtTieBreakByRegions(bin, W, H, best, bestS, secondCode, second, hlTxtModel._dec);
+        if (tb2 && tb2 !== best && tb2 === secondCode) {
+          const tS = bestS; bestS = second; second = tS;
+          const tC = best; best = secondCode; secondCode = tC;
+        }
+      }
       let colorDecided = false;
-      let cellLab = null;
       if (best && secondCode && bestS >= 0.22 && second >= 0.18) {
-        const x0r = Math.round(c * cw), y0r = Math.round(r * ch);
-        const x1r = Math.min(Math.round((c + 1) * cw), iw);
-        const y1r = Math.min(Math.round((r + 1) * ch), offWB.height);
-        cellLab = _hlSampleCellBgLab(wbData, x0r, y0r, x1r, y1r, iw);
-        const pick = _hlTxtTieBreakByColor(cellLab, best, secondCode, 5);
-        if (pick && pick !== best) {
+        if (!cellLab) cellLab = _hlSampleCellBgLab(wbData, x0, y0, x1, y1, iw);
+        const d1 = _hlLabDist(cellLab, codeLabCache.get(best) || _hlGetLabByCode(best));
+        const d2 = _hlLabDist(cellLab, codeLabCache.get(secondCode) || _hlGetLabByCode(secondCode));
+        if (Number.isFinite(d1) && Number.isFinite(d2) && Math.abs(d1 - d2) >= 5 && d2 < d1) {
           const tS = bestS; bestS = second; second = tS;
           const tC = best; best = secondCode; secondCode = tC;
           colorDecided = true;
         }
       }
       let bestD = Infinity;
-      let cur = hlColorMap?.[r]?.[c] ? String(hlColorMap[r][c]).toUpperCase() : '';
+      let cur = sourceColorMap?.[r]?.[c] ? String(sourceColorMap[r][c]).toUpperCase() : '';
+      const curN = cur ? _hlNormBeadCode(cur) : '';
       let curD = cur ? Infinity : Infinity;
       if (best) {
         if (!cellLab) cellLab = _hlSampleCellBgLab(wbData, x0, y0, x1, y1, iw);
-        bestD = _hlLabDist(cellLab, _hlGetLabByCode(best));
-        curD = cur ? _hlLabDist(cellLab, _hlGetLabByCode(cur)) : Infinity;
+        bestD = _hlLabDist(cellLab, codeLabCache.get(best) || _hlGetLabByCode(best));
+        curD = curN ? _hlLabDist(cellLab, proto.get(curN) || _hlGetLabByCode(curN)) : Infinity;
       }
       const colorStrong = !!(best && Number.isFinite(bestD) && bestD <= 26 && (!cur || (Number.isFinite(curD) && curD >= bestD + 8)));
       const gap = bestS - second;
-      if (!best || bestS < 0.22 || ((!colorDecided && !colorStrong) && gap < 0.04)) {
+      const minScore = onlySelected ? 0.18 : 0.22;
+      const minGap = onlySelected ? 0.018 : 0.04;
+      if (!best || bestS < minScore || ((!onlySelected && !colorDecided && !colorStrong) && gap < minGap) || (onlySelected && gap < minGap && !force)) {
         if (onlySelected && hlTxtDropUnmatched && hlColorMap[r][c]) {
           hlColorMap[r][c] = null;
           updated++;
@@ -4328,7 +4902,7 @@ function hlTxtRescan(ev) {
         continue;
       }
       {
-        if (bestD > 40) {
+        if (!onlySelected && bestD > 40) {
           if (onlySelected && hlTxtDropUnmatched && hlColorMap[r][c]) {
             hlColorMap[r][c] = null;
             updated++;
@@ -4336,7 +4910,7 @@ function hlTxtRescan(ev) {
           }
           continue;
         }
-        if (cur && curD <= 28 && bestD > curD + 10) continue;
+        if (!onlySelected && cur && curD <= 28 && bestD > curD + 10) continue;
       }
       confident++;
       if (hlColorMap[r][c] !== best) {
@@ -4346,7 +4920,6 @@ function hlTxtRescan(ev) {
     }
   }
   if (updated) {
-    const force = !!(ev && ev.altKey);
     if (!onlySelected && !force && updated > Math.max(120, Math.round(rows * cols * 0.12))) {
       hlColorMap = before;
       toast(`文字重扫已阻止（更新${updated}过多；按住 Alt 强制）`, 'warn');
@@ -4361,7 +4934,8 @@ function hlTxtRescan(ev) {
     hlRefineRender();
   }
   const scope = onlySelected ? '选中格' : '未分配';
-  toast(`文字重扫（${scope}）：提取${extracted}·命中${confident}·更新${updated}${dropped ? `（未识别→未分配 ${dropped}）` : ''}`, updated ? 'success' : 'warn');
+  const dbg = (onlySelected && !updated) ? `·组${groupCode || '-'}·对决${duel}·强改${duelForced}${duelPlusTen ? `·+10${duelPlusTen}` : ''}${duelColor ? `·色支${duelColor}` : ''}${binFailed ? `·提取失败${binFailed}` : ''}${force ? '·Alt' : ''}` : '';
+  toast(`文字重扫（${scope}）：提取${extracted}·命中${confident}·更新${updated}${dropped ? `（未识别→未分配 ${dropped}）` : ''}${dbg}`, updated ? 'success' : 'warn');
 }
 
 let hlAutoSaveTimer = null;
@@ -4419,6 +4993,271 @@ function _hlLabDist(a, b) {
   return Math.sqrt(d0 * d0 + d1 * d1 + d2 * d2);
 }
 
+// CIEDE2000 perceptual color distance. This is more stable than plain Lab
+// Euclidean distance for bead colors that are visually close.
+function _hlCiede2000(lab1, lab2) {
+  const [L1, a1, b1] = lab1, [L2, a2, b2] = lab2;
+  const kL = 1, kC = 1, kH = 1;
+  const deg2rad = Math.PI / 180;
+  const rad2deg = 180 / Math.PI;
+  const C1 = Math.sqrt(a1 * a1 + b1 * b1);
+  const C2 = Math.sqrt(a2 * a2 + b2 * b2);
+  const Cbar = (C1 + C2) / 2;
+  const Cbar7 = Math.pow(Cbar, 7);
+  const G = 0.5 * (1 - Math.sqrt(Cbar7 / (Cbar7 + Math.pow(25, 7))));
+  const ap1 = (1 + G) * a1;
+  const ap2 = (1 + G) * a2;
+  const Cp1 = Math.sqrt(ap1 * ap1 + b1 * b1);
+  const Cp2 = Math.sqrt(ap2 * ap2 + b2 * b2);
+  const hp = (x, y) => {
+    if (x === 0 && y === 0) return 0;
+    const v = Math.atan2(y, x) * rad2deg;
+    return v >= 0 ? v : v + 360;
+  };
+  const hp1 = hp(ap1, b1);
+  const hp2 = hp(ap2, b2);
+  const dLp = L2 - L1;
+  const dCp = Cp2 - Cp1;
+  let dhp = 0;
+  if (Cp1 * Cp2 !== 0) {
+    dhp = hp2 - hp1;
+    if (dhp > 180) dhp -= 360;
+    else if (dhp < -180) dhp += 360;
+  }
+  const dHp = 2 * Math.sqrt(Cp1 * Cp2) * Math.sin((dhp / 2) * deg2rad);
+  const Lbp = (L1 + L2) / 2;
+  const Cbp = (Cp1 + Cp2) / 2;
+  let hbp = hp1 + hp2;
+  if (Cp1 * Cp2 === 0) hbp = hp1 + hp2;
+  else if (Math.abs(hp1 - hp2) > 180) hbp = (hp1 + hp2 + 360) / 2;
+  else hbp = (hp1 + hp2) / 2;
+  if (hbp >= 360) hbp -= 360;
+  const T = 1
+    - 0.17 * Math.cos((hbp - 30) * deg2rad)
+    + 0.24 * Math.cos((2 * hbp) * deg2rad)
+    + 0.32 * Math.cos((3 * hbp + 6) * deg2rad)
+    - 0.20 * Math.cos((4 * hbp - 63) * deg2rad);
+  const dTheta = 30 * Math.exp(-Math.pow((hbp - 275) / 25, 2));
+  const Cbp7 = Math.pow(Cbp, 7);
+  const Rc = 2 * Math.sqrt(Cbp7 / (Cbp7 + Math.pow(25, 7)));
+  const Sl = 1 + (0.015 * Math.pow(Lbp - 50, 2)) / Math.sqrt(20 + Math.pow(Lbp - 50, 2));
+  const Sc = 1 + 0.045 * Cbp;
+  const Sh = 1 + 0.015 * Cbp * T;
+  const Rt = -Math.sin((2 * dTheta) * deg2rad) * Rc;
+  const vL = dLp / (kL * Sl);
+  const vC = dCp / (kC * Sc);
+  const vH = dHp / (kH * Sh);
+  return Math.sqrt(vL * vL + vC * vC + vH * vH + Rt * vC * vH);
+}
+
+function _hlCellHasInk(imgData, x0, y0, x1, y1, iw) {
+  const w = x1 - x0, h = y1 - y0;
+  if (w <= 1 || h <= 1) return false;
+  const pad = Math.max(1, Math.round(Math.min(w, h) * 0.18));
+  const sx0 = x0 + pad, sy0 = y0 + pad;
+  const sx1 = x1 - pad, sy1 = y1 - pad;
+  if (sx1 <= sx0 || sy1 <= sy0) return true;
+  const N = 5;
+  let dark = 0;
+  for (let yy = 0; yy < N; yy++) {
+    const py = Math.min(sy1 - 1, Math.max(sy0, Math.round(sy0 + (yy + 0.5) * ((sy1 - sy0) / N))));
+    for (let xx = 0; xx < N; xx++) {
+      const px = Math.min(sx1 - 1, Math.max(sx0, Math.round(sx0 + (xx + 0.5) * ((sx1 - sx0) / N))));
+      const i = (py * iw + px) * 4;
+      const r = imgData.data[i] || 0, g = imgData.data[i + 1] || 0, b = imgData.data[i + 2] || 0;
+      const isMag = (r > 150 && b > 150 && (g + 45) < Math.min(r, b));
+      const isRed = (r > 170 && (r - g) > 70 && (r - b) > 50 && g < 150 && b < 150);
+      if (isMag || isRed) continue;
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      if (lum < 185) dark++;
+    }
+  }
+  return dark >= 2;
+}
+
+function _hlCellLooksBlankGrid(imgData, x0, y0, x1, y1, iw) {
+  const w = x1 - x0, h = y1 - y0;
+  if (w <= 1 || h <= 1) return true;
+  const pad = Math.max(1, Math.round(Math.min(w, h) * 0.20));
+  const sx0 = x0 + pad, sy0 = y0 + pad;
+  const sx1 = x1 - pad, sy1 = y1 - pad;
+  if (sx1 <= sx0 || sy1 <= sy0) return true;
+  const N = 9;
+  let total = 0, nearWhite = 0, dark = 0, veryDark = 0, centerTotal = 0, centerVeryDark = 0, colored = 0, sumLum = 0;
+  const cx0 = x0 + w * 0.24, cx1 = x0 + w * 0.76;
+  const cy0 = y0 + h * 0.24, cy1 = y0 + h * 0.76;
+  for (let yy = 0; yy < N; yy++) {
+    const py = Math.min(sy1 - 1, Math.max(sy0, Math.round(sy0 + (yy + 0.5) * ((sy1 - sy0) / N))));
+    for (let xx = 0; xx < N; xx++) {
+      const px = Math.min(sx1 - 1, Math.max(sx0, Math.round(sx0 + (xx + 0.5) * ((sx1 - sx0) / N))));
+      const i = (py * iw + px) * 4;
+      const r = imgData.data[i] || 0, g = imgData.data[i + 1] || 0, b = imgData.data[i + 2] || 0;
+      const isMag = (r > 150 && b > 150 && (g + 45) < Math.min(r, b));
+      const isRed = (r > 170 && (r - g) > 70 && (r - b) > 50 && g < 150 && b < 150);
+      if (isMag || isRed) continue;
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+      total++;
+      sumLum += lum;
+      if (lum > 220) nearWhite++;
+      if (lum < 155) dark++;
+      if (lum < 112 && chroma < 95) veryDark++;
+      if (px >= cx0 && px <= cx1 && py >= cy0 && py <= cy1) {
+        centerTotal++;
+        if (lum < 118 && chroma < 95) centerVeryDark++;
+      }
+      if (chroma > 28 && lum < 245) colored++;
+    }
+  }
+  if (!total) return true;
+  const avgLum = sumLum / total;
+  const whiteRatio = nearWhite / total;
+  const darkRatio = dark / total;
+  const veryDarkRatio = veryDark / total;
+  const centerVeryDarkRatio = centerTotal ? centerVeryDark / centerTotal : 0;
+  const colorRatio = colored / total;
+  const hasCodeInk = veryDarkRatio >= 0.035 || centerVeryDarkRatio >= 0.035;
+  if (hasCodeInk) return false;
+  if (avgLum > 205 && whiteRatio > 0.58 && darkRatio < 0.10 && colorRatio < 0.10) return true;
+  // Empty grid cells often contain gray diagonal watermarks. Treat them as blank
+  // when there is no saturated fill and no black code-like ink.
+  return avgLum > 190 && whiteRatio > 0.42 && darkRatio < 0.24 && colorRatio < 0.08;
+}
+
+function _hlCellAiCandidateStats(imgData, x0, y0, x1, y1, iw) {
+  const w = x1 - x0, h = y1 - y0;
+  if (w <= 1 || h <= 1) return { shouldScan: false, coloredRatio: 0, blackRatio: 0, centerBlackRatio: 0 };
+  const pad = Math.max(1, Math.round(Math.min(w, h) * 0.16));
+  const sx0 = x0 + pad, sy0 = y0 + pad;
+  const sx1 = x1 - pad, sy1 = y1 - pad;
+  if (sx1 <= sx0 || sy1 <= sy0) return { shouldScan: false, coloredRatio: 0, blackRatio: 0, centerBlackRatio: 0 };
+  const cx0 = x0 + w * 0.22, cx1 = x0 + w * 0.78;
+  const cy0 = y0 + h * 0.22, cy1 = y0 + h * 0.78;
+  const N = 10;
+  let total = 0, colored = 0, black = 0, centerTotal = 0, centerBlack = 0, nearWhite = 0, grayInk = 0;
+  for (let yy = 0; yy < N; yy++) {
+    const py = Math.min(sy1 - 1, Math.max(sy0, Math.round(sy0 + (yy + 0.5) * ((sy1 - sy0) / N))));
+    for (let xx = 0; xx < N; xx++) {
+      const px = Math.min(sx1 - 1, Math.max(sx0, Math.round(sx0 + (xx + 0.5) * ((sx1 - sx0) / N))));
+      const i = (py * iw + px) * 4;
+      const r = imgData.data[i] || 0, g = imgData.data[i + 1] || 0, b = imgData.data[i + 2] || 0;
+      const isMag = (r > 150 && b > 150 && (g + 45) < Math.min(r, b));
+      const isRed = (r > 170 && (r - g) > 70 && (r - b) > 50 && g < 150 && b < 150);
+      if (isMag || isRed) continue;
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+      total++;
+      if (lum > 222) nearWhite++;
+      if (chroma > 30 && lum < 245) colored++;
+      if (lum < 105 && chroma < 95) black++;
+      if (lum >= 105 && lum < 185 && chroma < 32) grayInk++;
+      if (px >= cx0 && px <= cx1 && py >= cy0 && py <= cy1) {
+        centerTotal++;
+        if (lum < 105 && chroma < 95) centerBlack++;
+      }
+    }
+  }
+  if (!total) return { shouldScan: false, coloredRatio: 0, blackRatio: 0, centerBlackRatio: 0 };
+  const coloredRatio = colored / total;
+  const blackRatio = black / total;
+  const centerBlackRatio = centerTotal ? centerBlack / centerTotal : 0;
+  const whiteRatio = nearWhite / total;
+  const grayInkRatio = grayInk / total;
+  const hasColoredFill = coloredRatio >= 0.16;
+  const hasCenterCodeInk = blackRatio >= 0.035 && centerBlackRatio >= 0.055;
+  const grayWatermarkOnly = !hasColoredFill && !hasCenterCodeInk && whiteRatio > 0.48 && grayInkRatio >= 0.08;
+  return {
+    shouldScan: (hasColoredFill || hasCenterCodeInk) && !grayWatermarkOnly,
+    coloredRatio,
+    blackRatio,
+    centerBlackRatio,
+    grayInkRatio,
+    whiteRatio
+  };
+}
+
+function _hlFillGridByColor(imgData, rows, cols, allowedSet) {
+  const codes = allowedSet ? Array.from(allowedSet) : DB.getColors().map(c => (c.code || '').toUpperCase()).filter(Boolean);
+  const cLabs = codes.map(code => ({ code, lab: _hlGetLabByCode(code) }));
+  const next = Array.from({ length: rows }, () => Array(cols).fill(null));
+  const top = Array.from({ length: rows }, () => Array(cols).fill(null));
+  const iw = imgData.width;
+  const cellW = imgData.width / cols;
+  const cellH = imgData.height / rows;
+  let filled = 0, empty = 0;
+  for (let r = 0; r < rows; r++) {
+    const y0 = Math.max(0, Math.floor(r * cellH));
+    const y1 = Math.min(imgData.height, Math.floor((r + 1) * cellH));
+    for (let c = 0; c < cols; c++) {
+      const x0 = Math.max(0, Math.floor(c * cellW));
+      const x1 = Math.min(imgData.width, Math.floor((c + 1) * cellW));
+      if (_hlCellLooksBlankGrid(imgData, x0, y0, x1, y1, iw) || !_hlCellHasInk(imgData, x0, y0, x1, y1, iw)) { empty++; continue; }
+      const lab = _hlSampleCellBgLab(imgData, x0, y0, x1, y1, iw);
+      let b0 = null, d0 = 1e9, b1 = null, d1 = 1e9, b2 = null, d2 = 1e9;
+      for (const it of cLabs) {
+        const d = _hlLabDist(lab, it.lab);
+        if (d < d0) { b2 = b1; d2 = d1; b1 = b0; d1 = d0; b0 = it.code; d0 = d; }
+        else if (d < d1) { b2 = b1; d2 = d1; b1 = it.code; d1 = d; }
+        else if (d < d2) { b2 = it.code; d2 = d; }
+      }
+      if (!b0) continue;
+      next[r][c] = b0;
+      top[r][c] = { a: b0, da: d0, b: b1, db: d1, c: b2, dc: d2 };
+      filled++;
+    }
+  }
+  const d = hlDrawingId ? DB.getDrawing(hlDrawingId) : null;
+  const reqs = d && d.colorRequirements && d.colorRequirements.length ? d.colorRequirements : null;
+  if (!reqs || !allowedSet) return { next, filled, empty };
+  const idToCode = new Map(DB.getColors().map(c => [c.id, (c.code || '').toUpperCase()]));
+  const desired = new Map();
+  for (const r of reqs) {
+    const code = idToCode.get(r.colorId);
+    if (!code) continue;
+    const need = Math.max(0, parseInt(r.need || r.count || r.qty || 0, 10) || 0);
+    desired.set(code, need);
+  }
+  const assigned = new Map();
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const code = next[r][c];
+    if (!code) continue;
+    assigned.set(code, (assigned.get(code) || 0) + 1);
+  }
+  const candToCells = new Map();
+  const pushCand = (to, from, pen, r, c) => {
+    if (!to || to === from) return;
+    if (!candToCells.has(to)) candToCells.set(to, []);
+    candToCells.get(to).push({ from, pen, r, c });
+  };
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const t = top[r][c];
+    if (!t) continue;
+    const from = next[r][c];
+    pushCand(t.b, from, (t.db - t.da), r, c);
+    pushCand(t.c, from, (t.dc - t.da), r, c);
+  }
+  for (const arr of candToCells.values()) arr.sort((a, b) => a.pen - b.pen);
+  const isOver = code => (assigned.get(code) || 0) > (desired.get(code) || 0);
+  let moves = 0;
+  for (const [to, need] of desired.entries()) {
+    const cur = assigned.get(to) || 0;
+    if (need <= cur) continue;
+    const arr = candToCells.get(to) || [];
+    let idx = 0;
+    while ((assigned.get(to) || 0) < need && idx < arr.length) {
+      const it = arr[idx++];
+      const from = it.from;
+      if (!from || from === to) continue;
+      if (!isOver(from)) continue;
+      next[it.r][it.c] = to;
+      assigned.set(to, (assigned.get(to) || 0) + 1);
+      assigned.set(from, (assigned.get(from) || 0) - 1);
+      moves++;
+    }
+  }
+  return { next, filled, empty, moves };
+}
+
 function _hlSampleCellLab(imgData, x0, y0, x1, y1, iw) {
   const w = x1 - x0, h = y1 - y0;
   if (w <= 1 || h <= 1) return [100, 0, 0];
@@ -4463,6 +5302,9 @@ function _hlSampleCellBgLab(imgData, x0, y0, x1, y1, iw) {
       const px = Math.min(sx1 - 1, Math.max(sx0, Math.round(sx0 + (xx + 0.5) * ((sx1 - sx0) / N))));
       const i = (py * iw + px) * 4;
       const r = imgData.data[i] || 0, g = imgData.data[i + 1] || 0, b = imgData.data[i + 2] || 0;
+      const isMag = (r > 150 && b > 150 && (g + 45) < Math.min(r, b));
+      const isRed = (r > 170 && (r - g) > 70 && (r - b) > 50 && g < 150 && b < 150);
+      if (isMag || isRed) continue;
       pts.push(rgbToLab(r, g, b));
     }
   }
@@ -4510,30 +5352,24 @@ function openHlModal(drawingId) {
   hlEditPainting = false;
   hlEditHoverCell = null;
   document.getElementById('hlEditControls').style.display = 'none';
-  document.getElementById('hlEditBtn').style.display = 'none';
   document.getElementById('hlHighlightColorPicker').value = hlHighlightColor;
   {
     const chk = document.getElementById('hlShowCodesChk');
     if (chk) chk.checked = !!hlShowCodes;
   }
   {
-    try { hlUseTxtAssist = !!JSON.parse(localStorage.getItem('pdgj_hl_txt_assist') || 'false'); } catch (e) { hlUseTxtAssist = false; }
+    try {
+      const savedTxtAssist = localStorage.getItem('pdgj_hl_txt_assist');
+      hlUseTxtAssist = savedTxtAssist == null ? true : !!JSON.parse(savedTxtAssist);
+    } catch (e) { hlUseTxtAssist = true; }
     const chk = document.getElementById('hlTxtAssist');
     if (chk) chk.checked = !!hlUseTxtAssist;
   }
   if (hlWizard.active && hlWizard.drawingId === drawingId) {
     const enhance = document.getElementById('hlEnhanceSelect');
-    if (enhance) enhance.style.display = 'none';
-    const saveBtn = document.getElementById('hlSaveBtn');
-    const clearBtn = document.getElementById('hlClearScanBtn');
-    const editBtn = document.getElementById('hlEditBtn');
-    const refineBtn = document.getElementById('hlRefineBtn');
+    if (enhance) enhance.style.display = '';
     const showWrap = document.getElementById('hlShowCodesWrap');
     const wizFooter = document.getElementById('hlWizardFooter');
-    if (saveBtn) saveBtn.style.display = 'none';
-    if (clearBtn) clearBtn.style.display = 'none';
-    if (editBtn) editBtn.style.display = 'none';
-    if (refineBtn) refineBtn.style.display = 'none';
     if (showWrap) showWrap.style.display = 'none';
     if (wizFooter) wizFooter.style.display = 'flex';
   } else {
@@ -4557,8 +5393,11 @@ function openHlModal(drawingId) {
       _updateHlScopeChip([], false);
     }
   }
-  document.getElementById('hlPalette').innerHTML = '<div class="text-sm text-muted" style="padding:20px;text-align:center">对齐网格后点击「扫描识别」</div>';
+  document.getElementById('hlPalette').innerHTML = '<div class="text-sm text-muted" style="padding:20px;text-align:center">对齐网格后点击「OCR扫描」</div>';
   document.getElementById('hlTotal').textContent = '';
+  const wizUndo = document.getElementById('hlWizardAiUndoBtn');
+  if (wizUndo) wizUndo.style.display = 'none';
+  hlAiLastScan = null;
 
   DB.getDrawingImage(drawingId).then(src => {
     if (!src) { toast('此图纸未上传图片', 'warn'); return; }
@@ -4591,8 +5430,6 @@ function openHlModal(drawingId) {
           renderHlPalette();
           drawHlCanvas();
           document.getElementById('hlHint').textContent = '已加载上次识别结果，点击色号高亮对应位置';
-          document.getElementById('hlSaveBtn').style.display = '';
-          document.getElementById('hlClearScanBtn').style.display = '';
         }
       });
     };
@@ -4899,6 +5736,17 @@ function hlMouseUp() {
 }
 
 function hlWheel(e) {
+  if (_handleShiftWheelScroll(e, amount => {
+    hlOffset.x -= amount / Math.max(0.05, hlZoom);
+    drawHlCanvas();
+  })) return;
+  if (!(e.ctrlKey || e.metaKey)) {
+    const d = _wheelDeltaPx(e);
+    hlOffset.y -= d.y / Math.max(0.05, hlZoom);
+    drawHlCanvas();
+    e.preventDefault();
+    return;
+  }
   e.preventDefault();
   const canvas = document.getElementById('hlCanvas');
   const rect = canvas.getBoundingClientRect();
@@ -5133,10 +5981,64 @@ async function _hlTxtAssistApply(imgData, rows, cols, cellW, cellH, allowedCodes
   if (!codes.length) return 0;
   const W = hlTxtModel.W || 40, H = hlTxtModel.H || 40;
   const iw = imgData.width;
+  const proto = (hlColorMap && hlColorMap.length === rows && hlColorMap[0] && hlColorMap[0].length === cols)
+    ? _hlTxtBuildColorProtosFromMap(imgData, iw, rows, cols, cellW, cellH, hlColorMap, hlIgnoreMap, codes)
+    : new Map();
+  const codeLabCache = new Map();
+  for (const code of codes) codeLabCache.set(code, proto.get(code) || _hlGetLabByCode(code));
+  const prefixOf = code => String(code || '').replace(/[0-9]/g, '');
+  const prefixCounts = new Map();
+  for (const code of codes) {
+    const p = prefixOf(code);
+    if (!prefixCounts.has(p)) prefixCounts.set(p, 0);
+    prefixCounts.set(p, prefixCounts.get(p) + 1);
+  }
+  const needByCode = new Map();
+  const d = hlDrawingId ? DB.getDrawing(hlDrawingId) : null;
+  const reqs = d && Array.isArray(d.colorRequirements) ? d.colorRequirements : [];
+  for (const req of reqs) {
+    const color = DB.getColor(req.colorId);
+    const code = color && color.code ? _hlNormBeadCode(String(color.code).toUpperCase()) : '';
+    const need = Math.max(0, parseInt(req.count || req.need || req.qty || 0, 10) || 0);
+    if (code && need > 0) needByCode.set(code, need);
+  }
+  const liveCounts = new Map();
+  if (hlColorMap) {
+    hlColorMap.forEach(rr => rr.forEach(cc => {
+      const code = cc ? _hlNormBeadCode(String(cc).toUpperCase()) : '';
+      if (code) liveCounts.set(code, (liveCounts.get(code) || 0) + 1);
+    }));
+  }
+  const problemPrefixes = new Set();
+  if (needByCode.size) {
+    for (const [code, need] of needByCode.entries()) {
+      const prefix = prefixOf(code);
+      if ((prefixCounts.get(prefix) || 0) < 2) continue;
+      const cur = liveCounts.get(code) || 0;
+      const slack = Math.max(3, Math.round(need * 0.08));
+      if (cur < need - slack || cur > need + slack) problemPrefixes.add(prefix);
+    }
+  }
+  const canTxtQuotaCorrect = (from, to) => {
+    if (!from || !to || from === to) return false;
+    if (!needByCode.size) return prefixOf(from) === prefixOf(to);
+    const fromNeed = needByCode.get(from);
+    const toNeed = needByCode.get(to);
+    if (fromNeed == null || toNeed == null) return false;
+    const fromNow = liveCounts.get(from) || 0;
+    const toNow = liveCounts.get(to) || 0;
+    const fromSlack = Math.max(3, Math.round(fromNeed * 0.08));
+    const toSlack = Math.max(3, Math.round(toNeed * 0.08));
+    if (toNow >= toNeed + toSlack) return false;
+    return toNow < toNeed - toSlack || fromNow > fromNeed + fromSlack;
+  };
   let updated = 0;
   let checked = 0;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
+      const cur0 = hlColorMap?.[r]?.[c] ? String(hlColorMap[r][c]).toUpperCase() : '';
+      const curN = cur0 ? _hlNormBeadCode(cur0) : '';
+      if (curN && (!allowedCodes || allowedCodes.has(curN)) && !problemPrefixes.has(prefixOf(curN))) continue;
       const x0 = Math.max(0, Math.floor(c * cellW));
       const y0 = Math.max(0, Math.floor(r * cellH));
       const x1 = Math.min(iw, Math.ceil((c + 1) * cellW));
@@ -5144,8 +6046,26 @@ async function _hlTxtAssistApply(imgData, rows, cols, cellW, cellH, allowedCodes
       const bin = _hlTxtExtractBinFromCell(imgData, x0, y0, x1, y1, iw, W, H);
       if (!bin) continue;
       checked++;
+      let cellLab = null;
+      let candCodes = codes;
+      if (codes.length > 18) {
+        cellLab = _hlSampleCellBgLab(imgData, x0, y0, x1, y1, iw);
+        const rank = [];
+        for (const code of codes) {
+          const lab = codeLabCache.get(code) || _hlGetLabByCode(code);
+          const d = _hlLabDist(cellLab, lab);
+          if (!Number.isFinite(d)) continue;
+          rank.push([d, code]);
+        }
+        rank.sort((a, b) => a[0] - b[0]);
+        const topK = 16;
+        const maxD = 40;
+        let cc = rank.filter(x => x[0] <= maxD).slice(0, topK).map(x => x[1]);
+        if (cc.length < Math.min(6, Math.min(topK, rank.length))) cc = rank.slice(0, topK).map(x => x[1]);
+        if (cc.length) candCodes = cc;
+      }
       let best = null, bestS = 0, second = 0, secondCode = null;
-      for (const code of codes) {
+      for (const code of candCodes) {
         const arr = hlTxtModel._dec[code];
         if (!arr || !arr.length) continue;
         let s = 0;
@@ -5161,31 +6081,52 @@ async function _hlTxtAssistApply(imgData, rows, cols, cellW, cellH, allowedCodes
         const tS = bestS; bestS = second; second = tS;
         const tC = best; best = secondCode; secondCode = tC;
       }
+      {
+        const tb10 = _hlTxtTieBreakPlusTenByTpl(bin, W, H, best, bestS, secondCode, second, hlTxtModel._dec);
+        if (tb10 && tb10 !== best && tb10 === secondCode) {
+          const tS = bestS; bestS = second; second = tS;
+          const tC = best; best = secondCode; secondCode = tC;
+        }
+      }
+      {
+        const tb2 = _hlTxtTieBreakByRegions(bin, W, H, best, bestS, secondCode, second, hlTxtModel._dec);
+        if (tb2 && tb2 !== best && tb2 === secondCode) {
+          const tS = bestS; bestS = second; second = tS;
+          const tC = best; best = secondCode; secondCode = tC;
+        }
+      }
       let colorDecided = false;
-      let cellLab = null;
       if (best && secondCode && bestS >= 0.28 && second >= 0.24) {
-        cellLab = _hlSampleCellBgLab(imgData, x0, y0, x1, y1, iw);
-        const pick = _hlTxtTieBreakByColor(cellLab, best, secondCode, 5);
-        if (pick && pick !== best) {
+        if (!cellLab) cellLab = _hlSampleCellBgLab(imgData, x0, y0, x1, y1, iw);
+        const d1 = _hlLabDist(cellLab, codeLabCache.get(best) || _hlGetLabByCode(best));
+        const d2 = _hlLabDist(cellLab, codeLabCache.get(secondCode) || _hlGetLabByCode(secondCode));
+        if (Number.isFinite(d1) && Number.isFinite(d2) && Math.abs(d1 - d2) >= 5 && d2 < d1) {
           const tS = bestS; bestS = second; second = tS;
           const tC = best; best = secondCode; secondCode = tC;
           colorDecided = true;
         }
       }
       let bestD = Infinity;
-      const cur = hlColorMap?.[r]?.[c] ? String(hlColorMap[r][c]).toUpperCase() : '';
-      let curD = cur ? Infinity : Infinity;
+      let curD = curN ? Infinity : Infinity;
       if (best) {
         if (!cellLab) cellLab = _hlSampleCellBgLab(imgData, x0, y0, x1, y1, iw);
-        bestD = _hlLabDist(cellLab, _hlGetLabByCode(best));
-        curD = cur ? _hlLabDist(cellLab, _hlGetLabByCode(cur)) : Infinity;
+        bestD = _hlLabDist(cellLab, codeLabCache.get(best) || _hlGetLabByCode(best));
+        curD = curN ? _hlLabDist(cellLab, proto.get(curN) || _hlGetLabByCode(curN)) : Infinity;
       }
-      const colorStrong = !!(best && Number.isFinite(bestD) && bestD <= 24 && (!cur || (Number.isFinite(curD) && curD >= bestD + 8)));
+      const colorStrong = !!(best && Number.isFinite(bestD) && bestD <= 24 && (!curN || (Number.isFinite(curD) && curD >= bestD + 8)));
       const gap = bestS - second;
       if (!best || bestS < 0.28 || ((!colorDecided && !colorStrong) && gap < 0.06)) continue;
       {
         if (bestD > 38) continue;
-        if (cur && curD <= 28 && bestD > curD + 10) continue;
+        if (curN && curD <= 28 && bestD > curD + 10) continue;
+      }
+      if (curN && curN !== best) {
+        if (prefixOf(curN) !== prefixOf(best)) continue;
+        if (!canTxtQuotaCorrect(curN, best)) continue;
+        liveCounts.set(curN, Math.max(0, (liveCounts.get(curN) || 0) - 1));
+        liveCounts.set(best, (liveCounts.get(best) || 0) + 1);
+      } else if (!curN && best) {
+        liveCounts.set(best, (liveCounts.get(best) || 0) + 1);
       }
       if (hlColorMap[r][c] !== best) {
         hlColorMap[r][c] = best;
@@ -5224,7 +6165,7 @@ async function doHighlightScan() {
   } else {
     allColors = allDbColors;
   }
-  _updateHlScopeChip(allColors, !!reqs);
+  _updateHlScopeChip(allColors, true);
   // Precompute CIELAB values for all candidate colors once (expensive to recompute per pixel)
   const labColors = prepareColorsLab(allColors);
   hlScanColors = allColors;
@@ -5256,11 +6197,11 @@ async function doHighlightScan() {
 
   const SAMPLE_N = (rows * cols > 12000) ? 3 : (rows * cols > 6000 ? 4 : 5);
   const PAD_FRAC = 0.18;
-  const DIST_THRESHOLD = 18;
+  const DIST_THRESHOLD = 24;
   const findNearestFromLab = (L, A, B, colorsWithLab) => {
     let best = null, bestDist = Infinity;
     for (const c of colorsWithLab) {
-      const d = Math.sqrt((L-c._lab[0])**2+(A-c._lab[1])**2+(B-c._lab[2])**2);
+      const d = _hlCiede2000([L, A, B], c._lab);
       if (d < bestDist) { bestDist = d; best = c; }
     }
     return { color: best, dist: bestDist };
@@ -5283,9 +6224,23 @@ async function doHighlightScan() {
         const s = arr.reduce((acc,p)=>[acc[0]+p[0],acc[1]+p[1],acc[2]+p[2]], [0,0,0]);
         return [s[0]/arr.length, s[1]/arr.length, s[2]/arr.length];
       };
-      if (!a0.length) c0 = pts[(Math.random()*pts.length)|0].slice(0);
+      if (!a0.length) {
+        let far = pts[0], fd = -1;
+        for (const p of pts) {
+          const d = (p[0]-c1[0])**2+(p[1]-c1[1])**2+(p[2]-c1[2])**2;
+          if (d > fd) { fd = d; far = p; }
+        }
+        c0 = far.slice(0);
+      }
       else c0 = mean(a0);
-      if (!a1.length) c1 = pts[(Math.random()*pts.length)|0].slice(0);
+      if (!a1.length) {
+        let far = pts[0], fd = -1;
+        for (const p of pts) {
+          const d = (p[0]-c0[0])**2+(p[1]-c0[1])**2+(p[2]-c0[2])**2;
+          if (d > fd) { fd = d; far = p; }
+        }
+        c1 = far.slice(0);
+      }
       else c1 = mean(a1);
     }
     const major = a0.length >= a1.length ? a0 : a1;
@@ -5349,6 +6304,7 @@ async function doHighlightScan() {
       const y0 = Math.max(0, Math.floor(row * cellH));
       const x1 = Math.min(iw, Math.ceil((col + 1) * cellW));
       const y1 = Math.min(ih, Math.ceil((row + 1) * cellH));
+      if (_hlCellLooksBlankGrid(imgData, x0, y0, x1, y1, iw)) continue;
       const pad = Math.max(1, Math.round(Math.min(x1 - x0, y1 - y0) * PAD_FRAC));
       const sx0 = x0 + pad, sy0 = y0 + pad;
       const sx1 = x1 - pad, sy1 = y1 - pad;
@@ -5532,6 +6488,279 @@ async function doHighlightScan() {
     }
   }
 
+  // ── 阶段 2.2：本地 OCR 逐行读取格子里的色号文字（补空格 + 配额纠错）──────────
+  // OCR 容易受水印/网格线影响；只有当图例数量支持时才覆盖已有颜色结果。
+  {
+    const ocrCodes = allColors.map(c => (c.code || '').toUpperCase()).filter(Boolean);
+    if (ocrCodes.length) {
+      try {
+        hintEl.textContent = '本地 OCR 读取格子文字…';
+        await new Promise(r => setTimeout(r, 0));
+        const gridOcrCanvas = document.createElement('canvas');
+        const maxDim = 2600;
+        const baseMax = Math.max(hlGrid.w, hlGrid.h);
+        const scale = Math.max(1, Math.min(2, maxDim / Math.max(1, baseMax)));
+        gridOcrCanvas.width = Math.max(2, Math.round(hlGrid.w * scale));
+        gridOcrCanvas.height = Math.max(2, Math.round(hlGrid.h * scale));
+        const gctx = gridOcrCanvas.getContext('2d');
+        gctx.imageSmoothingEnabled = true;
+        gctx.imageSmoothingQuality = 'high';
+        gctx.drawImage(hlImg, hlGrid.x, hlGrid.y, hlGrid.w, hlGrid.h, 0, 0, gridOcrCanvas.width, gridOcrCanvas.height);
+        const buildGridOcrCandidates = () => {
+          const candidates = [];
+          const seen = new Set();
+          const add = (r, c, reason) => {
+            const key = `${r}:${c}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            candidates.push({ r, c, reason });
+          };
+          const need = new Map();
+          if (reqs) {
+            for (const req of reqs) {
+              const color = allColors.find(x => x.id === req.colorId);
+              const code = color && color.code ? String(color.code).toUpperCase() : '';
+              if (!code) continue;
+              need.set(code, Math.max(0, parseInt(req.count || req.need || req.qty || 0, 10) || 0));
+            }
+          }
+          const counts = new Map();
+          hlColorMap.forEach(rr => rr.forEach(cc => {
+            if (!cc) return;
+            const code = String(cc).toUpperCase();
+            counts.set(code, (counts.get(code) || 0) + 1);
+          }));
+          const prefixOf = code => String(code || '').replace(/[0-9]/g, '');
+          const deficitPrefix = new Set();
+          const overCodes = new Set();
+          if (need.size) {
+            for (const [code, n] of need.entries()) {
+              const cur = counts.get(code) || 0;
+              const slack = Math.max(3, Math.round(n * 0.06));
+              if (cur < n - slack) deficitPrefix.add(prefixOf(code));
+              if (cur > n + slack) overCodes.add(code);
+            }
+          }
+          for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+              const cur = hlColorMap?.[r]?.[c] ? String(hlColorMap[r][c]).toUpperCase() : '';
+              if (cur) {
+                if (overCodes.has(cur) || deficitPrefix.has(prefixOf(cur))) add(r, c, 'quota-prefix');
+                continue;
+              }
+              const x0 = Math.max(0, Math.floor(c * cellW));
+              const y0 = Math.max(0, Math.floor(r * cellH));
+              const x1 = Math.min(iw, Math.ceil((c + 1) * cellW));
+              const y1 = Math.min(ih, Math.ceil((r + 1) * cellH));
+              const st = _hlCellAiCandidateStats(imgData, x0, y0, x1, y1, iw);
+              if (st.shouldScan) add(r, c, 'missing');
+            }
+          }
+          return candidates.slice(0, 1600);
+        };
+        const ocrCandidates = buildGridOcrCandidates();
+        if (!ocrCandidates.length) throw new Error('no grid ocr candidates');
+        const ocrData = await _localModelFetchJson('/grid', {
+          image: gridOcrCanvas.toDataURL('image/jpeg', 0.92),
+          rows,
+          cols,
+          allowedCodes: ocrCodes,
+          mode: 'paddle',
+          candidates: ocrCandidates
+        }, 240000);
+        const cells = Array.isArray(ocrData && ocrData.cells) ? ocrData.cells : [];
+        const beforeLocalOcr = hlColorMap.map(row => row.slice());
+        const needByCode = new Map();
+        if (reqs) {
+          for (const req of reqs) {
+            const color = allColors.find(x => x.id === req.colorId);
+            const code = color && color.code ? String(color.code).toUpperCase() : '';
+            if (!code) continue;
+            needByCode.set(code, Math.max(0, parseInt(req.count || req.need || req.qty || 0, 10) || 0));
+          }
+        }
+        const liveCounts = new Map();
+        hlColorMap.forEach(rr => rr.forEach(cc => {
+          if (!cc) return;
+          const code = String(cc).toUpperCase();
+          liveCounts.set(code, (liveCounts.get(code) || 0) + 1);
+        }));
+        const canQuotaCorrect = (from, to, conf = 0) => {
+          if (!from || !to || from === to || !needByCode.size) return false;
+          const fromNeed = needByCode.get(from);
+          const toNeed = needByCode.get(to);
+          if (fromNeed == null || toNeed == null) return false;
+          const fromNow = liveCounts.get(from) || 0;
+          const toNow = liveCounts.get(to) || 0;
+          const fromSlack = Math.max(4, Math.round(fromNeed * 0.06));
+          const toSlack = Math.max(4, Math.round(toNeed * 0.06));
+          const targetHasRoom = toNow < toNeed + toSlack;
+          const targetClearlyShort = toNow < toNeed - toSlack;
+          const sourceClearlyOver = fromNow > fromNeed + fromSlack;
+          if (!targetHasRoom) return false;
+          if (conf >= 0.68) return targetClearlyShort || sourceClearlyOver;
+          return targetClearlyShort;
+        };
+        let localUpdated = 0;
+        let localChangedExisting = 0;
+        for (const cell of cells) {
+          const r = parseInt(cell.r, 10);
+          const c = parseInt(cell.c, 10);
+          const conf = Number(cell.conf || 0);
+          if (r < 0 || c < 0 || r >= rows || c >= cols) continue;
+          if (conf && conf < 0.32) continue;
+          const code = _hlNormBeadCode(String(cell.code || '').toUpperCase());
+          if (!code) continue;
+          if (allowedCodes && !allowedCodes.has(code)) continue;
+          const cur = hlColorMap?.[r]?.[c] ? _hlNormBeadCode(String(hlColorMap[r][c]).toUpperCase()) : '';
+          const x0 = Math.max(0, Math.floor(c * cellW));
+          const y0 = Math.max(0, Math.floor(r * cellH));
+          const x1 = Math.min(iw, Math.ceil((c + 1) * cellW));
+          const y1 = Math.min(ih, Math.ceil((r + 1) * cellH));
+          if (cur && cur !== code) {
+            if (conf && conf < 0.55) continue;
+            if (!canQuotaCorrect(cur, code, conf)) continue;
+            localChangedExisting++;
+            liveCounts.set(cur, Math.max(0, (liveCounts.get(cur) || 0) - 1));
+            liveCounts.set(code, (liveCounts.get(code) || 0) + 1);
+            hlColorMap[r][c] = code;
+            localUpdated++;
+            continue;
+          }
+          if (!cur && (_hlCellLooksBlankGrid(imgData, x0, y0, x1, y1, iw) || !_hlCellHasInk(imgData, x0, y0, x1, y1, iw))) continue;
+          if (!cur) liveCounts.set(code, (liveCounts.get(code) || 0) + 1);
+          hlColorMap[r][c] = code;
+          localUpdated++;
+        }
+        if (needByCode.size) {
+          const prefixOfRisk = code => String(code || '').replace(/[0-9]/g, '');
+          const codesByPrefix = new Map();
+          for (const code of needByCode.keys()) {
+            const p = prefixOfRisk(code);
+            if (!codesByPrefix.has(p)) codesByPrefix.set(p, []);
+            codesByPrefix.get(p).push(code);
+          }
+          const riskyPrefixes = new Set();
+          for (const [prefix, list] of codesByPrefix.entries()) {
+            if (list.length < 2) continue;
+            for (const code of list) {
+              const need = needByCode.get(code) || 0;
+              const cur = liveCounts.get(code) || 0;
+              const slack = Math.max(4, Math.round(need * 0.08));
+              if (cur < need - slack || cur > need + slack) {
+                riskyPrefixes.add(prefix);
+                break;
+              }
+            }
+          }
+          if (riskyPrefixes.size) {
+            const fineCandidates = [];
+            const fineSeen = new Set();
+            const addFine = (r, c, reason) => {
+              const key = `${r}:${c}`;
+              if (fineSeen.has(key)) return;
+              fineSeen.add(key);
+              fineCandidates.push({ r, c, reason });
+            };
+            for (let r = 0; r < rows; r++) {
+              for (let c = 0; c < cols; c++) {
+                const cur = hlColorMap?.[r]?.[c] ? _hlNormBeadCode(String(hlColorMap[r][c]).toUpperCase()) : '';
+                if (cur && riskyPrefixes.has(prefixOfRisk(cur))) {
+                  addFine(r, c, 'same-prefix-risk');
+                  continue;
+                }
+                if (!cur) {
+                  const x0 = Math.max(0, Math.floor(c * cellW));
+                  const y0 = Math.max(0, Math.floor(r * cellH));
+                  const x1 = Math.min(iw, Math.ceil((c + 1) * cellW));
+                  const y1 = Math.min(ih, Math.ceil((r + 1) * cellH));
+                  const st = _hlCellAiCandidateStats(imgData, x0, y0, x1, y1, iw);
+                  if (st.shouldScan) addFine(r, c, 'empty-risk');
+                }
+              }
+            }
+            if (fineCandidates.length) {
+              const fineLimit = 700;
+              const fineData = await _localModelFetchJson('/grid', {
+                image: gridOcrCanvas.toDataURL('image/jpeg', 0.92),
+                rows,
+                cols,
+                allowedCodes: ocrCodes,
+                mode: 'cells',
+                candidates: fineCandidates.slice(0, fineLimit)
+              }, 240000);
+              const fineCells = Array.isArray(fineData && fineData.cells) ? fineData.cells : [];
+              for (const cell of fineCells) {
+                const r = parseInt(cell.r, 10);
+                const c = parseInt(cell.c, 10);
+                const conf = Number(cell.conf || 0);
+                if (r < 0 || c < 0 || r >= rows || c >= cols) continue;
+                if (conf && conf < 0.36) continue;
+                const code = _hlNormBeadCode(String(cell.code || '').toUpperCase());
+                if (!code || (allowedCodes && !allowedCodes.has(code))) continue;
+                const cur = hlColorMap?.[r]?.[c] ? _hlNormBeadCode(String(hlColorMap[r][c]).toUpperCase()) : '';
+                if (cur === code) continue;
+                if (cur) {
+                  if (prefixOfRisk(cur) !== prefixOfRisk(code)) continue;
+                  if (conf && conf < 0.48) continue;
+                  if (!canQuotaCorrect(cur, code, Math.max(conf, 0.7))) continue;
+                  localChangedExisting++;
+                  liveCounts.set(cur, Math.max(0, (liveCounts.get(cur) || 0) - 1));
+                }
+                liveCounts.set(code, (liveCounts.get(code) || 0) + 1);
+                hlColorMap[r][c] = code;
+                localUpdated++;
+              }
+            }
+          }
+        }
+        if (localChangedExisting > Math.max(80, Math.round(rows * cols * 0.08))) {
+          hlColorMap = beforeLocalOcr;
+          toast(`本地 OCR 改动已有色号过多（${localChangedExisting} 格），已跳过覆盖，只保留颜色识别结果`, 'warn');
+          localUpdated = 0;
+        }
+        if (localUpdated > 0 && reqs) {
+          const beforeCounts = {};
+          beforeLocalOcr.forEach(rr => rr.forEach(cc => { if (cc) beforeCounts[cc] = (beforeCounts[cc] || 0) + 1; }));
+          const afterCounts = {};
+          hlColorMap.forEach(rr => rr.forEach(cc => { if (cc) afterCounts[cc] = (afterCounts[cc] || 0) + 1; }));
+          let bad = null;
+          for (const req of reqs) {
+            const color = allColors.find(x => x.id === req.colorId);
+            const code = color && color.code ? String(color.code).toUpperCase() : '';
+            if (!code) continue;
+            const need = Math.max(0, parseInt(req.count || req.need || req.qty || 0, 10) || 0);
+            if (!need) continue;
+            const beforeN = beforeCounts[code] || 0;
+            const afterN = afterCounts[code] || 0;
+            const tolerance = Math.max(12, Math.round(need * 0.15));
+            if (afterN > need + tolerance && afterN > beforeN + tolerance) {
+              bad = { code, need, after: afterN };
+              break;
+            }
+          }
+          if (bad) {
+            hlColorMap = beforeLocalOcr;
+            toast(`本地 OCR 结果异常：${bad.code} 识别到 ${bad.after}，超过图例 ${bad.need}，已回退`, 'warn');
+            localUpdated = 0;
+          }
+        }
+        if (localUpdated > 0) {
+          const cmLocal = {};
+          hlColorMap.forEach(rr => rr.forEach(cc => { if (cc) cmLocal[cc] = (cmLocal[cc]||0)+1; }));
+          hlDetected = Object.entries(cmLocal)
+            .map(([code, count]) => ({ code, count, color: allColors.find(c => c.code.toUpperCase() === code.toUpperCase()) }))
+            .sort((a, b) => b.count - a.count);
+          renderHlPalette();
+          drawHlCanvas();
+          toast(`本地 OCR 读取 ${localUpdated} 格`, 'success');
+        }
+      } catch (e) {
+        toast('本地 OCR 未启用或读取失败，已继续使用颜色识别', 'warn');
+      }
+    }
+  }
+
   // ── 阶段 2.5：H1/H2 白色与透明格专项检测 ──────────────────────────────────────
   {
     const h1InReqs = allColors.find(c => c.code.toUpperCase() === 'H1');
@@ -5550,6 +6779,7 @@ async function doHighlightScan() {
           const x0 = Math.round(c * cw), y0 = Math.round(r * ch);
           const x1 = Math.min(Math.round((c + 1) * cw), iw);
           const y1 = Math.min(Math.round((r + 1) * ch), offWB.height);
+          if (_hlCellLooksBlankGrid(wbData, x0, y0, x1, y1, iw)) continue;
           // 判断是否为浅色格（亮度中心 > 130）
           let lightCnt = 0, total = 0;
           const step = Math.max(1, Math.round(Math.min(x1 - x0, y1 - y0) / 6));
@@ -5588,8 +6818,9 @@ async function doHighlightScan() {
     }
   }
 
-  // ── 阶段 3：灰阶按“需求配额”全局校正（对黑白灰多的图纸非常有效）───────────────
-  if (reqs && achCandidates.length >= 2 && achHeavy) {
+  // ── 阶段 3：灰阶按“需求配额”全局校正 ────────────────────────────────
+  // 已关闭：水印和导出色偏会让纯颜色/亮度分组不稳定，不能为了凑需求数量覆盖格子里印着的色号文字。
+  if (false && reqs && achCandidates.length >= 2 && achHeavy) {
     const reqCountByCode = {};
     for (const r of reqs) {
       const c = allColors.find(x => x.id === r.colorId);
@@ -5694,10 +6925,6 @@ async function doHighlightScan() {
   }
 
   hintEl.textContent = '点击色号高亮对应位置，可多选';
-  if (!(hlWizard.active && hlWizard.drawingId === hlDrawingId)) {
-    document.getElementById('hlSaveBtn').style.display = '';
-    document.getElementById('hlClearScanBtn').style.display = '';
-  }
   toast(`扫描完成：${hlDetected.length} 种色号`, 'success');
   saveHlScan();
   if (hlWizard.active && hlWizard.drawingId === hlDrawingId) {
@@ -5705,6 +6932,276 @@ async function doHighlightScan() {
     closeModal('modalHighlight');
     openHlRefine();
   }
+}
+
+async function doHighlightGlmScan() {
+  if (!hlImg) { toast('请先上传图纸图片', 'warn'); return; }
+  const allDbColors = DB.getColors();
+  if (!allDbColors.length) { toast('色彩库为空，请先添加色号', 'warn'); return; }
+  if (!hlGrid || !hlGrid.rows || !hlGrid.cols) { toast('请先对齐网格', 'warn'); return; }
+
+  const drawingData = hlDrawingId ? DB.getDrawing(hlDrawingId) : null;
+  const reqs = drawingData && drawingData.colorRequirements && drawingData.colorRequirements.length
+    ? drawingData.colorRequirements : null;
+  if (!reqs) {
+    toast('GLM识别需要先完成 Step1 图例识别，避免模型胡乱猜色号', 'warn');
+    return;
+  }
+  const needByCode = {};
+  let allColors = allDbColors;
+  let allowedCodes = null;
+  const reqIds = new Set(reqs.map(r => r.colorId));
+  const scoped = allDbColors.filter(c => reqIds.has(c.id));
+  for (const req of reqs) {
+    const color = allDbColors.find(x => x.id === req.colorId);
+    const code = color && color.code ? String(color.code).toUpperCase() : '';
+    const need = Math.max(0, parseInt(req.count || req.need || req.qty || 0, 10) || 0);
+    if (code && need > 0) needByCode[code] = need;
+  }
+  if (scoped.length && Object.keys(needByCode).length) {
+    allColors = scoped.filter(c => needByCode[String(c.code || '').toUpperCase()] > 0);
+    allowedCodes = new Set(Object.keys(needByCode));
+  } else {
+    toast('色号需求ID已过期，建议重新识别色号后再 GLM识别', 'warn');
+    return;
+  }
+  _updateHlScopeChip(allColors, !!reqs);
+  hlScanColors = allColors;
+  hlAllowedCodes = allowedCodes;
+
+  const cols = hlGrid.cols, rows = hlGrid.rows;
+  const cellH = hlGrid.h / rows;
+  const hintEl = document.getElementById('hlHint');
+  const codes = Object.keys(needByCode);
+  if (!codes.length) { toast('没有可用色号需求，无法 GLM 识别', 'warn'); return; }
+  if (!hlColorMap || !Array.isArray(hlColorMap) || !hlColorMap.length) {
+    toast('GLM识别需要先点「OCR扫描」生成初稿', 'warn');
+    return;
+  }
+
+  const gridCanvas = document.createElement('canvas');
+  gridCanvas.width = Math.max(2, Math.round(hlGrid.w));
+  gridCanvas.height = Math.max(2, Math.round(hlGrid.h));
+  const gridCtx = gridCanvas.getContext('2d');
+  gridCtx.drawImage(hlImg, hlGrid.x, hlGrid.y, hlGrid.w, hlGrid.h, 0, 0, gridCanvas.width, gridCanvas.height);
+  if (hlEnhanceMode !== 'original') {
+    const gd = gridCtx.getImageData(0, 0, gridCanvas.width, gridCanvas.height);
+    enhanceImageData(gd, hlEnhanceMode);
+    gridCtx.putImageData(gd, 0, 0);
+  }
+  const gridData = gridCtx.getImageData(0, 0, gridCanvas.width, gridCanvas.height);
+  const gw = gridData.width, gh = gridData.height;
+  const cellW2 = gw / cols, cellH2 = gh / rows;
+  const blockRows = 5;
+  const blockCols = 5;
+  const blocks = [];
+  const blockKeys = new Set();
+  const aiCandidateKeys = new Set();
+  let missingCandidateCount = 0;
+  const prefixOfAi = code => String(code || '').replace(/[0-9]/g, '');
+  const currentCountByCode = {};
+  hlColorMap.forEach(rr => rr.forEach(cc => {
+    const code = cc ? String(cc).toUpperCase() : '';
+    if (code) currentCountByCode[code] = (currentCountByCode[code] || 0) + 1;
+  }));
+  const aiDeficitPrefixes = new Set();
+  const aiOverCodes = new Set();
+  for (const code of Object.keys(needByCode)) {
+    const need = needByCode[code] || 0;
+    const cur = currentCountByCode[code] || 0;
+    const slack = Math.max(3, Math.round(need * 0.08));
+    if (cur < need - slack) aiDeficitPrefixes.add(prefixOfAi(code));
+    if (cur > need + slack) aiOverCodes.add(code);
+  }
+  const addAiBlock = (r, c) => {
+    const keyCell = `${r}:${c}`;
+    if (aiCandidateKeys.has(keyCell)) return;
+    aiCandidateKeys.add(keyCell);
+    missingCandidateCount++;
+    const r0 = Math.floor(r / blockRows) * blockRows;
+    const c0 = Math.floor(c / blockCols) * blockCols;
+    const key = `${r0}:${c0}`;
+    if (blockKeys.has(key)) return;
+    blockKeys.add(key);
+    blocks.push({
+      r0,
+      c0,
+      rows: Math.min(blockRows, rows - r0),
+      cols: Math.min(blockCols, cols - c0)
+    });
+  };
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const curCode = hlColorMap[r] && hlColorMap[r][c] ? String(hlColorMap[r][c]).toUpperCase() : '';
+      if (curCode) {
+        if (aiOverCodes.has(curCode) || aiDeficitPrefixes.has(prefixOfAi(curCode))) addAiBlock(r, c);
+        continue;
+      }
+      const x0 = Math.max(0, Math.floor(c * cellW2));
+      const y0 = Math.max(0, Math.floor(r * cellH2));
+      const x1 = Math.min(gw, Math.ceil((c + 1) * cellW2));
+      const y1 = Math.min(gh, Math.ceil((r + 1) * cellH2));
+      const aiStats = _hlCellAiCandidateStats(gridData, x0, y0, x1, y1, gw);
+      if (!aiStats.shouldScan) continue;
+      addAiBlock(r, c);
+    }
+  }
+  if (!blocks.length) {
+    toast('没有需要 GLM 识别的候选格', 'warn');
+    return;
+  }
+
+  const tile = 72;
+  const header = 28;
+  const totalBatches = blocks.length;
+  let filled = 0;
+  let failed = 0;
+  const acceptedCountByCode = {};
+  hlColorMap.forEach(rr => rr.forEach(cc => {
+    const code = cc ? String(cc).toUpperCase() : '';
+    if (code) acceptedCountByCode[code] = (acceptedCountByCode[code] || 0) + 1;
+  }));
+
+  for (let b = 0; b < totalBatches; b++) {
+    const block = blocks[b];
+    hintEl.textContent = `GLM识别… ${b + 1}/${totalBatches}（候选 ${missingCandidateCount} 格）`;
+    await new Promise(r => setTimeout(r, 0));
+
+    const x0 = Math.max(0, Math.floor(block.c0 * cellW2));
+    const y0 = Math.max(0, Math.floor(block.r0 * cellH2));
+    const x1 = Math.min(gw, Math.ceil((block.c0 + block.cols) * cellW2));
+    const y1 = Math.min(gh, Math.ceil((block.r0 + block.rows) * cellH2));
+    const sheet = document.createElement('canvas');
+    sheet.width = header + block.cols * tile + 2;
+    sheet.height = header + block.rows * tile + 2;
+    const sctx = sheet.getContext('2d');
+    sctx.fillStyle = '#fff';
+    sctx.fillRect(0, 0, sheet.width, sheet.height);
+    sctx.imageSmoothingEnabled = false;
+    sctx.drawImage(gridCanvas, x0, y0, x1 - x0, y1 - y0, header, header, block.cols * tile, block.rows * tile);
+    sctx.imageSmoothingEnabled = true;
+
+    sctx.font = 'bold 15px Arial, sans-serif';
+    sctx.textAlign = 'center';
+    sctx.textBaseline = 'middle';
+    for (let c = 0; c < block.cols; c++) {
+      const cx = header + c * tile;
+      sctx.fillStyle = '#2563eb';
+      sctx.fillRect(cx, 0, tile, header);
+      sctx.fillStyle = '#fff';
+      sctx.fillText(String(c), cx + tile / 2, header / 2);
+    }
+    for (let r = 0; r < block.rows; r++) {
+      const ry = header + r * tile;
+      sctx.fillStyle = '#2563eb';
+      sctx.fillRect(0, ry, header, tile);
+      sctx.fillStyle = '#fff';
+      sctx.fillText(String(r), header / 2, ry + tile / 2);
+    }
+    sctx.strokeStyle = 'rgba(249,115,22,0.95)';
+    sctx.lineWidth = 1.5;
+    for (let c = 0; c <= block.cols; c++) {
+      const x = header + c * tile;
+      sctx.beginPath();
+      sctx.moveTo(x, header);
+      sctx.lineTo(x, header + block.rows * tile);
+      sctx.stroke();
+    }
+    for (let r = 0; r <= block.rows; r++) {
+      const y = header + r * tile;
+      sctx.beginPath();
+      sctx.moveTo(header, y);
+      sctx.lineTo(header + block.cols * tile, y);
+      sctx.stroke();
+    }
+    sctx.font = 'bold 11px Arial, sans-serif';
+    sctx.textAlign = 'left';
+    sctx.textBaseline = 'top';
+    for (let r = 0; r < block.rows; r++) {
+      for (let c = 0; c < block.cols; c++) {
+        const i = r * block.cols + c;
+        const lx = header + c * tile + 3;
+        const ly = header + r * tile + 3;
+        sctx.fillStyle = '#2563eb';
+        sctx.fillRect(lx, ly, 22, 14);
+        sctx.fillStyle = '#fff';
+        sctx.fillText(String(i), lx + 3, ly + 1);
+      }
+    }
+
+    try {
+      const data = await _localModelFetchJson('/cells-glm', {
+        image: sheet.toDataURL('image/png'),
+        count: block.rows * block.cols,
+        allowedCodes: codes
+      }, 240000);
+      const cells = Array.isArray(data && data.cells) ? data.cells : [];
+      for (const cell of cells) {
+        const idx = parseInt(cell.i, 10);
+        if (idx < 0 || idx >= block.rows * block.cols) continue;
+        const rr = Math.floor(idx / block.cols);
+        const cc = idx % block.cols;
+        if (rr < 0 || cc < 0 || rr >= block.rows || cc >= block.cols) continue;
+        const gr = block.r0 + rr;
+        const gc = block.c0 + cc;
+        if (gr < 0 || gc < 0 || gr >= rows || gc >= cols) continue;
+        if (!aiCandidateKeys.has(`${gr}:${gc}`)) continue;
+        const code = _hlNormBeadCode(String(cell.code || '').toUpperCase());
+        if (!code) continue;
+        if (allowedCodes && !allowedCodes.has(code)) continue;
+        const need = needByCode[code] || 0;
+        if (!need) continue;
+        const curCode = hlColorMap[gr] && hlColorMap[gr][gc] ? String(hlColorMap[gr][gc]).toUpperCase() : '';
+        if (curCode === code) continue;
+        const cap = need + Math.max(2, Math.round(need * 0.08));
+        if ((acceptedCountByCode[code] || 0) >= cap) continue;
+        if (curCode) {
+          const curNeed = needByCode[curCode] || 0;
+          const curNow = acceptedCountByCode[curCode] || 0;
+          const curOver = curNeed > 0 && curNow > curNeed + Math.max(2, Math.round(curNeed * 0.08));
+          const targetShort = (acceptedCountByCode[code] || 0) < need - Math.max(2, Math.round(need * 0.08));
+          if (!curOver && !targetShort) continue;
+        }
+        const vx0 = Math.max(0, Math.floor(gc * cellW2));
+        const vy0 = Math.max(0, Math.floor(gr * cellH2));
+        const vx1 = Math.min(gw, Math.ceil((gc + 1) * cellW2));
+        const vy1 = Math.min(gh, Math.ceil((gr + 1) * cellH2));
+        const aiStats = _hlCellAiCandidateStats(gridData, vx0, vy0, vx1, vy1, gw);
+        if (!aiStats.shouldScan) continue;
+        if (!curCode) filled++;
+        else acceptedCountByCode[curCode] = Math.max(0, (acceptedCountByCode[curCode] || 0) - 1);
+        hlColorMap[gr][gc] = code;
+        acceptedCountByCode[code] = (acceptedCountByCode[code] || 0) + 1;
+      }
+    } catch (e) {
+      failed++;
+      console.warn('GLM region scan failed', e);
+    }
+
+    const cm = {};
+    hlColorMap.forEach(rr => rr.forEach(cc => { if (cc) cm[cc] = (cm[cc] || 0) + 1; }));
+    hlDetected = Object.entries(cm)
+      .map(([code, count]) => ({ code, count, color: allColors.find(c => (c.code || '').toUpperCase() === code) }))
+      .sort((a, b) => b.count - a.count);
+    renderHlPalette();
+    drawHlCanvas();
+  }
+
+  hintEl.textContent = '点击色号高亮对应位置，可多选';
+  const overHits = [];
+  if (reqs) {
+    for (const d of hlDetected) {
+      const need = needByCode[String(d.code || '').toUpperCase()] || 0;
+      if (!need) continue;
+      const tolerance = Math.max(8, Math.round(need * 0.18));
+      if (d.count > need + tolerance) overHits.push(`${d.code} ${d.count}/${need}`);
+    }
+  }
+  if (overHits.length) toast(`GLM识别结果疑似偏多：${overHits.slice(0, 4).join('、')}`, 'warn');
+  else if (failed) toast(`GLM识别完成：补 ${filled} 格，${failed} 段失败`, 'warn');
+  else toast(`GLM识别完成：补 ${filled} 格`, filled ? 'success' : 'warn');
+  if (filled > 0) saveHlScan();
+  // GLM识别只辅助当前初稿，不自动进入 Step3，方便先核对结果。
 }
 
 function _updateHlScopeChip(colors, restricted) {
@@ -5941,6 +7438,12 @@ function hlPgSetupEvents() {
   canvas.addEventListener('mouseup', ()=>hlPg.panning=false);
   canvas.addEventListener('mouseleave', ()=>hlPg.panning=false);
   canvas.addEventListener('wheel', e => {
+    if (_handleShiftWheelScroll(e, amount => {
+      hlPg.ox -= amount;
+      hlPgClamp();
+      hlPgDraw();
+    })) return;
+    if (!(e.ctrlKey || e.metaKey)) return;
     e.preventDefault();
     const r=canvas.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
     const ix=mx/hlPg.zoom-hlPg.ox/hlPg.zoom, iy=my/hlPg.zoom-hlPg.oy/hlPg.zoom;
@@ -6110,29 +7613,48 @@ async function pullFromCloud() {
 
     // Step 4: restore metadata
     localStorage.setItem(DB.KEY_COLORS, JSON.stringify(meta.colors));
-    localStorage.setItem(DB.KEY_DRAWINGS, JSON.stringify(meta.drawings));
+    const drawingsSave = saveImportedDrawingsWithQuotaFallback(meta.drawings);
     await IDB.clear();
+    if (drawingsSave.previewImages && Object.keys(drawingsSave.previewImages).length) {
+      await IDB.putAllBestEffort(drawingsSave.previewImages);
+    }
 
     // Step 5: restore images one by one
+    let imgOk = 0, imgSkipped = 0, imgFailed = 0;
     for (let i = 0; i < meta.drawings.length; i++) {
       const d = meta.drawings[i];
       btn.textContent = `下载图片 ${i + 1} / ${meta.drawings.length}…`;
       const imgFile   = gist.files[`pindou-img-${d.id}.txt`];
       const thumbFile = gist.files[`pindou-thumb-${d.id}.txt`];
-      if (imgFile) {
-        const content = await _gistReadFile(imgFile, cfg.token);
-        if (content) await IDB.put('img_' + d.id, content);
-      }
       if (thumbFile) {
         const content = await _gistReadFile(thumbFile, cfg.token);
-        if (content) await IDB.put('thumb_' + d.id, content);
+        if (content) {
+          try { await IDB.put('thumb_' + d.id, content); imgOk++; }
+          catch (e) { if (IDB.isQuotaError(e)) imgSkipped++; else imgFailed++; }
+        }
+      }
+      if (imgFile) {
+        const content = await _gistReadFile(imgFile, cfg.token);
+        if (content) {
+          try { await IDB.put('img_' + d.id, content); imgOk++; }
+          catch (e) { if (IDB.isQuotaError(e)) imgSkipped++; else imgFailed++; }
+        }
       }
     }
 
-    toast('云端数据恢复成功，即将刷新页面…', 'success');
+    if (drawingsSave.scanStripped) {
+      toast('云端数据已恢复；手机空间不足，已自动跳过图纸扫描缓存', 'warn');
+    } else if (imgSkipped || imgFailed) {
+      toast(`云端数据已恢复；${imgSkipped + imgFailed} 个图片因手机存储空间不足未导入`, 'warn');
+    } else {
+      toast('云端数据恢复成功，即将刷新页面…', 'success');
+    }
     setTimeout(() => location.reload(), 1500);
   } catch(e) {
-    toast('拉取失败：' + e.message, 'warn');
+    const msg = IDB.isQuotaError && IDB.isQuotaError(e)
+      ? '手机浏览器存储空间不足，图片未能全部恢复。'
+      : e.message;
+    toast('拉取失败：' + msg, 'warn');
   } finally {
     btn.disabled = false; btn.textContent = '⬇️ 从云端拉取';
   }
@@ -6164,8 +7686,8 @@ function runHistoricalMigration() {
         console.warn(`[迁移] 跳过：图纸「${d.name}」中 colorId=${r.colorId} count=${r.count}，在色号库中未找到对应色号`);
         continue;
       }
-      console.log(`[迁移] 扣除：${c.code} ${c.stock} - ${r.count} → ${Math.max(0, c.stock - r.count)}（图纸：${d.name}）`);
-      DB.updateColor(r.colorId, { stock: Math.max(0, c.stock - r.count) });
+      console.log(`[迁移] 扣除：${c.code} ${c.stock} - ${r.count} → ${c.stock - r.count}（图纸：${d.name}）`);
+      DB.updateColor(r.colorId, { stock: c.stock - r.count });
       deductOk++;
     }
   }
@@ -6187,12 +7709,22 @@ async function exportAllData() {
     const colors = DB.getColors();
     const drawings = DB.getDrawings();
     const images = await IDB.getAll();
+    const extras = {};
+    try {
+      const m = localStorage.getItem(HL_TXT_KEY);
+      if (m) extras[HL_TXT_KEY] = m;
+      const d = localStorage.getItem(HL_TXT_DROP_KEY);
+      if (d != null) extras[HL_TXT_DROP_KEY] = d;
+      const a = localStorage.getItem('pdgj_hl_txt_assist');
+      if (a != null) extras['pdgj_hl_txt_assist'] = a;
+    } catch (e) {}
     const payload = {
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       colors,
       drawings,
-      images
+      images,
+      extras
     };
     const blob = new Blob([JSON.stringify(payload)], { type: 'application/json;charset=utf-8' });
     const a = document.createElement('a');
@@ -6210,6 +7742,76 @@ async function exportAllData() {
   }
 }
 
+function stripDrawingHeavyBackupFields(drawings) {
+  return (Array.isArray(drawings) ? drawings : []).map(d => {
+    if (!d || typeof d !== 'object') return d;
+    const {
+      image,
+      thumbnail,
+      hlScan,
+      hlOutDataUrl,
+      originalImage,
+      ...rest
+    } = d;
+    return rest;
+  });
+}
+
+async function buildLitePreviewImages(drawings, opts = {}) {
+  const images = {};
+  const maxDim = opts.maxDim || 1400;
+  const maxCell = opts.maxCell || 16;
+  for (const d of (Array.isArray(drawings) ? drawings : [])) {
+    if (!d || !d.id) continue;
+    let preview = null;
+    const scan = d.hlScan;
+    if ((d.status === 'generated' || d.status === 'completed') && scan && scan.colorMap) {
+      const pack = hlBuildPreviewPackFromScan(scan, {
+        maxDim,
+        maxCell,
+        pad: 10,
+        showGrid: true,
+        showCodes: true,
+        mime: 'image/jpeg',
+        quality: 0.72
+      });
+      preview = pack && pack.url;
+    }
+    if (!preview) preview = await DB.getDrawingThumbnail(d.id).catch(() => null);
+    if (preview) images['thumb_' + d.id] = preview;
+  }
+  return images;
+}
+
+function saveImportedDrawingsWithQuotaFallback(drawings) {
+  try {
+    localStorage.setItem(DB.KEY_DRAWINGS, JSON.stringify(drawings || []));
+    return { scanStripped: false, previewImages: {} };
+  } catch (e) {
+    if (!(IDB.isQuotaError && IDB.isQuotaError(e))) throw e;
+    const previewImages = {};
+    for (const d of (Array.isArray(drawings) ? drawings : [])) {
+      if (!d || !d.id) continue;
+      const scan = d.hlScan;
+      if ((d.status === 'generated' || d.status === 'completed') && scan && scan.colorMap) {
+        const pack = hlBuildPreviewPackFromScan(scan, {
+          maxDim: 1400,
+          maxCell: 16,
+          pad: 10,
+          showGrid: true,
+          showCodes: true,
+          mime: 'image/jpeg',
+          quality: 0.72
+        });
+        if (pack && pack.url) previewImages['thumb_' + d.id] = pack.url;
+      }
+    }
+    const stripped = stripDrawingHeavyBackupFields(drawings);
+    localStorage.setItem(DB.KEY_DRAWINGS, JSON.stringify(stripped));
+    return { scanStripped: true, previewImages };
+  }
+}
+
 async function exportAllDataLite() {
   const btn = document.getElementById('exportLiteBtn');
   const origText = btn.textContent;
@@ -6217,13 +7819,18 @@ async function exportAllDataLite() {
   btn.textContent = '导出中…';
   try {
     const colors = DB.getColors();
-    const drawings = DB.getDrawings();
+    const fullDrawings = DB.getDrawings();
+    btn.textContent = '生成预览…';
+    const images = await buildLitePreviewImages(fullDrawings);
+    const drawings = stripDrawingHeavyBackupFields(fullDrawings);
     const payload = {
-      version: 1,
+      version: 3,
       lite: true,
+      mobileLite: true,
       exportedAt: new Date().toISOString(),
       colors,
-      drawings
+      drawings,
+      images
     };
     const blob = new Blob([JSON.stringify(payload)], { type: 'application/json;charset=utf-8' });
     const a = document.createElement('a');
@@ -6232,7 +7839,7 @@ async function exportAllDataLite() {
     a.download = `拼豆管家轻量备份_${date}.json`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(a.href);
-    toast(`轻量备份成功：${colors.length} 个色号，${drawings.length} 个图纸（不含图片）`, 'success');
+    toast(`轻量备份成功：${colors.length} 个色号，${drawings.length} 个图纸，${Object.keys(images).length} 张手机预览图`, 'success');
   } catch(e) {
     toast('导出失败：' + e.message, 'warn');
   } finally {
@@ -6255,23 +7862,45 @@ async function importAllData(file) {
       `确定要导入备份数据吗？\n\n` +
       `备份内容：${data.colors.length} 个色号 · ${data.drawings.length} 个图纸 · ${imgCount} 张图片\n` +
       `备份时间：${data.exportedAt ? new Date(data.exportedAt).toLocaleString('zh-CN') : '未知'}\n\n` +
+      (imgCount ? `手机浏览器空间不足时会自动跳过部分原图，但库存、图纸需求和识别数据会继续恢复。\n\n` : '') +
       `⚠️ 当前设备的全部数据将被覆盖，此操作不可撤销！`
     )) return;
 
-    // Restore localStorage
+    // Restore metadata first. Images are restored best-effort below because mobile Safari has a small quota.
     localStorage.setItem(DB.KEY_COLORS, JSON.stringify(data.colors));
-    localStorage.setItem(DB.KEY_DRAWINGS, JSON.stringify(data.drawings));
-
-    // Restore IDB: clear then write all images
-    await IDB.clear();
-    if (data.images && Object.keys(data.images).length) {
-      await IDB.putAll(data.images);
+    const drawingsSave = saveImportedDrawingsWithQuotaFallback(data.drawings);
+    if (data.extras && typeof data.extras === 'object') {
+      try {
+        const allow = new Set([HL_TXT_KEY, HL_TXT_DROP_KEY, 'pdgj_hl_txt_assist']);
+        for (const [k, v] of Object.entries(data.extras)) {
+          if (!allow.has(k)) continue;
+          if (typeof v === 'string') localStorage.setItem(k, v);
+        }
+      } catch (e) {}
     }
 
-    toast('数据恢复成功，即将刷新页面…', 'success');
+    // Restore IDB: clear then write images one by one. If the device runs out of space,
+    // keep metadata/scan data and skip the oversized image files instead of failing the whole import.
+    await IDB.clear();
+    let imageResult = { ok: 0, skipped: 0, failed: 0, total: 0 };
+    const imagePayload = { ...(data.images || {}), ...(drawingsSave.previewImages || {}) };
+    if (Object.keys(imagePayload).length) {
+      imageResult = await IDB.putAllBestEffort(imagePayload);
+    }
+
+    if (drawingsSave.scanStripped) {
+      toast('数据已恢复；手机空间不足，已自动跳过图纸扫描缓存并保留预览图', 'warn');
+    } else if (imageResult.skipped || imageResult.failed) {
+      toast(`数据已恢复；${imageResult.skipped + imageResult.failed} 个图片因手机存储空间不足未导入`, 'warn');
+    } else {
+      toast('数据恢复成功，即将刷新页面…', 'success');
+    }
     setTimeout(() => location.reload(), 1500);
   } catch(e) {
-    toast('导入失败：' + e.message, 'warn');
+    const msg = IDB.isQuotaError && IDB.isQuotaError(e)
+      ? '手机浏览器存储空间不足。请使用「轻量导出（手机）」备份导入，或先清理已生成原图。'
+      : e.message;
+    toast('导入失败：' + msg, 'warn');
   }
 }
 
@@ -6344,11 +7973,8 @@ function clearHlScan() {
   hlEditPainting = false;
   hlEditHoverCell = null;
   document.getElementById('hlEditControls').style.display = 'none';
-  document.getElementById('hlEditBtn').style.display = 'none';
   renderHlPalette();
   drawHlCanvas();
-  document.getElementById('hlSaveBtn').style.display = 'none';
-  document.getElementById('hlClearScanBtn').style.display = 'none';
   toast('已清除保存的识别结果', 'success');
 }
 
@@ -6357,7 +7983,7 @@ function renderHlPalette() {
   const totalEl = document.getElementById('hlTotal');
   const refineBtn = document.getElementById('hlRefineBtn');
   if (!hlDetected.length) {
-    el.innerHTML = '<div class="text-sm text-muted" style="padding:20px;text-align:center">对齐网格后点击「扫描识别」</div>';
+    el.innerHTML = '<div class="text-sm text-muted" style="padding:20px;text-align:center">对齐网格后点击「OCR扫描」</div>';
     totalEl.textContent = '';
     if (refineBtn) refineBtn.style.display = 'none';
     renderHlRequirements();
@@ -6685,7 +8311,7 @@ function hlRefineSetGroup(key) {
 
 function hlRefineToggleSort() {
   hlRefineState.sort = hlRefineState.sort === 'sim' ? 'pos' : 'sim';
-  document.getElementById('hlRefineSortLabel').textContent = hlRefineState.sort === 'sim' ? '相似' : '位置';
+  document.getElementById('hlRefineSortLabel').textContent = hlRefineState.sort === 'sim' ? '字形异常优先' : '位置';
   hlRefineState.selected.clear();
   hlRefineState.lastPos = null;
   hlRefineState.lastMapId = null;
@@ -6751,7 +8377,7 @@ function hlRefineEnsureCells() {
     }
     const code = hlColorMap?.[r]?.[c] ? String(hlColorMap[r][c]).toUpperCase() : null;
     const ignored = !!(hlIgnoreMap && hlIgnoreMap[r] && hlIgnoreMap[r][c]);
-    return { r, c, code, ignored, lum, lab: [L, A, Bb] };
+    return { r, c, code, ignored, lum, lab: [L, A, Bb], txtBin: null };
   });
   hlThumbCache.clear();
 }
@@ -6774,6 +8400,30 @@ function hlRefineGetThumb(rcKey, r, c) {
   catch (e) { url = cv.toDataURL('image/png'); }
   hlThumbCache.set(rcKey, url);
   return url;
+}
+
+function hlRefineGetTxtBin(cell) {
+  if (!cell || cell.txtBin) return cell ? cell.txtBin : null;
+  const m = hlTxtLoadModel();
+  if (!m || !hlGridImgData || !hlGrid) return null;
+  const W = m.W || 40, H = m.H || 40;
+  const rows = hlGrid.rows, cols = hlGrid.cols;
+  const cw = hlGridImgData.width / cols;
+  const ch = hlGridImgData.height / rows;
+  const x0 = Math.round(cell.c * cw), y0 = Math.round(cell.r * ch);
+  const x1 = Math.min(Math.round((cell.c + 1) * cw), hlGridImgData.width);
+  const y1 = Math.min(Math.round((cell.r + 1) * ch), hlGridImgData.height);
+  cell.txtBin = _hlTxtExtractBinFromCell(hlGridImgData, x0, y0, x1, y1, hlGridImgData.width, W, H);
+  return cell.txtBin;
+}
+
+function hlRefineTxtScoreForCode(cell, code) {
+  const m = hlTxtLoadModel();
+  const arr = m?._dec?.[code] || null;
+  if (!arr || !arr.length) return null;
+  const bin = hlRefineGetTxtBin(cell);
+  if (!bin) return null;
+  return _hlTxtBestTplScore(bin, arr).bestS || 0;
 }
 
 function hlRefineRender() {
@@ -7036,6 +8686,7 @@ function hlRefineBindMap() {
 
   cv.addEventListener('wheel', e => {
     if (!hlRefineState.open) return;
+    if (_handleShiftWheelScroll(e)) return;
     if (!(e.ctrlKey || e.metaKey)) return;
     e.preventDefault();
     const f = e.deltaY < 0 ? 1.12 : (1 / 1.12);
@@ -7197,17 +8848,43 @@ function hlRefineRenderTiles() {
     ids.sort((a, b) => (hlRefineCells[a].r - hlRefineCells[b].r) || (hlRefineCells[a].c - hlRefineCells[b].c));
   } else {
     if (!isUn && key !== '__UNASSIGNED__') {
-      const tl = _hlGetLabByCode(key);
+      hlTxtLoadModel();
+      const hasTxtTpl = !!(hlTxtModel?._dec?.[key]?.length);
       const s = new Map();
-      for (const id of ids) {
-        const c = hlRefineCells[id];
-        const d0 = c.lab[0] - tl[0], d1 = c.lab[1] - tl[1], d2 = c.lab[2] - tl[2];
-        s.set(id, { d: d0*d0 + d1*d1 + d2*d2, lum: c.lum, r: c.r, c: c.c });
+      if (hasTxtTpl) {
+        for (const id of ids) {
+          const c = hlRefineCells[id];
+          const score = hlRefineTxtScoreForCode(c, key);
+          s.set(id, { txt: score == null ? -1 : score, lum: c.lum, r: c.r, c: c.c });
+        }
+        ids.sort((a, b) => {
+          const A = s.get(a), B = s.get(b);
+          return (A.txt - B.txt) || (A.lum - B.lum) || (A.r - B.r) || (A.c - B.c);
+        });
+      } else {
+        const vals = ids.map(id => hlRefineCells[id]).filter(Boolean);
+        const median = arr => {
+          if (!arr.length) return 0;
+          const a = arr.slice().sort((x, y) => x - y);
+          return a[Math.floor(a.length / 2)];
+        };
+        const tl = vals.length >= 5
+          ? [
+            median(vals.map(c => c.lab[0])),
+            median(vals.map(c => c.lab[1])),
+            median(vals.map(c => c.lab[2])),
+          ]
+          : _hlGetLabByCode(key);
+        for (const id of ids) {
+          const c = hlRefineCells[id];
+          const d0 = c.lab[0] - tl[0], d1 = c.lab[1] - tl[1], d2 = c.lab[2] - tl[2];
+          s.set(id, { d: d0*d0 + d1*d1 + d2*d2, lum: c.lum, r: c.r, c: c.c });
+        }
+        ids.sort((a, b) => {
+          const A = s.get(a), B = s.get(b);
+          return (B.d - A.d) || (A.lum - B.lum) || (A.r - B.r) || (A.c - B.c);
+        });
       }
-      ids.sort((a, b) => {
-        const A = s.get(a), B = s.get(b);
-        return (A.d - B.d) || (A.lum - B.lum) || (A.r - B.r) || (A.c - B.c);
-      });
     } else {
       const req = hlRefineReqOrder();
       const labs = req.map(code => _hlGetLabByCode(code));
@@ -7447,6 +9124,129 @@ function hlRefineSelNone() {
   hlRefineRender();
 }
 
+function hlRefineExportSelected() {
+  if (!hlRefineState.open) { toast('请先进入 Step3 微调界面', 'warn'); return; }
+  const ids = Array.from(hlRefineState.selected || []).filter(x => Number.isFinite(x));
+  if (!ids.length) { toast('请先框选一些格子', 'warn'); return; }
+  if (!hlImg || !hlGrid || !hlGrid.cols || !hlGrid.rows) { toast('缺少图纸数据', 'warn'); return; }
+  const cols = hlGrid.cols, rows = hlGrid.rows;
+  const cellW = hlGrid.w / cols, cellH = hlGrid.h / rows;
+  const list = [];
+  for (const id of ids) {
+    const cc = hlRefineCells?.[id];
+    if (!cc) continue;
+    if (cc.r < 0 || cc.c < 0 || cc.r >= rows || cc.c >= cols) continue;
+    const code0 = hlColorMap?.[cc.r]?.[cc.c] ? String(hlColorMap[cc.r][cc.c]).toUpperCase() : '';
+    const code = code0 ? _hlNormBeadCode(code0) : '';
+    list.push({ id, r: cc.r, c: cc.c, code });
+  }
+  if (!list.length) { toast('选中格无效', 'warn'); return; }
+  list.sort((a, b) => (a.r - b.r) || (a.c - b.c));
+  const cap = 120;
+  const clipped = list.slice(0, cap);
+  if (list.length > cap) toast(`选中${list.length}格，已仅导出前${cap}格`, 'warn');
+  const tile = 96;
+  const pad = 10;
+  const capH = 22;
+  const perRow = Math.min(8, Math.max(4, Math.floor((window.innerWidth - 40) / (tile + pad))));
+  const outCols = Math.min(perRow, clipped.length);
+  const outRows = Math.ceil(clipped.length / outCols);
+  const cv = document.createElement('canvas');
+  cv.width = pad + outCols * (tile + pad);
+  cv.height = pad + outRows * (tile + capH + pad);
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.font = '700 12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+  for (let i = 0; i < clipped.length; i++) {
+    const it = clipped[i];
+    const rr = Math.floor(i / outCols);
+    const cc = i % outCols;
+    const x = pad + cc * (tile + pad);
+    const y = pad + rr * (tile + capH + pad);
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(x, y, tile, tile);
+    const sx = Math.round(hlGrid.x + it.c * cellW);
+    const sy = Math.round(hlGrid.y + it.r * cellH);
+    const sw = Math.max(1, Math.round(cellW));
+    const sh = Math.max(1, Math.round(cellH));
+    try { ctx.drawImage(hlImg, sx, sy, sw, sh, x, y, tile, tile); } catch {}
+    ctx.fillStyle = 'rgba(0,0,0,0.62)';
+    ctx.fillRect(x, y + tile - 18, tile, 18);
+    ctx.fillStyle = '#ffffff';
+    const label = `${it.code || '--'}  r${it.r + 1}c${it.c + 1}`;
+    ctx.fillText(label, x + 6, y + tile - 9);
+  }
+  const url = cv.toDataURL('image/png');
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `疑难格子_${dateStr()}.png`;
+  a.click();
+  toast('已导出选中格截图', 'success');
+}
+
+function hlRefineBuildSelectedSheet(maxCells = 36) {
+  if (!hlRefineState.open) throw new Error('请先进入 Step3 微调界面');
+  const ids = Array.from(hlRefineState.selected || []).filter(x => Number.isFinite(x));
+  if (!ids.length) throw new Error('请先选中要复核的疑难格');
+  if (!hlImg || !hlGrid || !hlGrid.cols || !hlGrid.rows) throw new Error('缺少图纸数据');
+  const cols = hlGrid.cols, rows = hlGrid.rows;
+  const cellW = hlGrid.w / cols, cellH = hlGrid.h / rows;
+  const list = [];
+  for (const id of ids) {
+    const cc = hlRefineCells?.[id];
+    if (!cc) continue;
+    if (cc.r < 0 || cc.c < 0 || cc.r >= rows || cc.c >= cols) continue;
+    const code0 = hlColorMap?.[cc.r]?.[cc.c] ? String(hlColorMap[cc.r][cc.c]).toUpperCase() : '';
+    const code = code0 ? _hlNormBeadCode(code0) : '';
+    list.push({ i: list.length, id, r: cc.r, c: cc.c, code });
+    if (list.length >= maxCells) break;
+  }
+  if (!list.length) throw new Error('选中格无效');
+  const tile = 112;
+  const pad = 10;
+  const capH = 24;
+  const outCols = Math.min(6, Math.max(1, Math.ceil(Math.sqrt(list.length))));
+  const outRows = Math.ceil(list.length / outCols);
+  const cv = document.createElement('canvas');
+  cv.width = pad + outCols * (tile + pad);
+  cv.height = pad + outRows * (tile + capH + pad);
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.font = '700 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+  for (let i = 0; i < list.length; i++) {
+    const it = list[i];
+    const rr = Math.floor(i / outCols);
+    const cc = i % outCols;
+    const x = pad + cc * (tile + pad);
+    const y = pad + rr * (tile + capH + pad);
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(x, y, tile, tile);
+    const sx = Math.round(hlGrid.x + it.c * cellW);
+    const sy = Math.round(hlGrid.y + it.r * cellH);
+    const sw = Math.max(1, Math.round(cellW));
+    const sh = Math.max(1, Math.round(cellH));
+    try { ctx.drawImage(hlImg, sx, sy, sw, sh, x, y, tile, tile); } catch {}
+    ctx.strokeStyle = 'rgba(0,0,0,0.24)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, tile - 1, tile - 1);
+    ctx.fillStyle = 'rgba(0,0,0,0.70)';
+    ctx.fillRect(x, y + tile - capH, tile, capH);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(`i=${it.i} ${it.code || '--'}`, x + 6, y + tile - capH / 2);
+  }
+  return { image: cv.toDataURL('image/jpeg', 0.9), cells: list, clipped: ids.length > list.length };
+}
+
 function hlRefineAssign() {
   const input = document.getElementById('hlRefineAssignInput');
   const raw = (input && input.value ? input.value.trim().toUpperCase() : '');
@@ -7465,6 +9265,7 @@ function hlRefineAssign() {
     hlColorMap[c.r][c.c] = code;
     hlIgnoreMap[c.r][c.c] = false;
   }
+  hlTxtSelectedRescanBaseline = null;
   _hlRebuildDetected();
   hlAutoSaveScan();
   renderHlPalette();
@@ -7495,6 +9296,7 @@ function hlRefineClear() {
       hlIgnoreMap[c.r][c.c] = false;
     }
   }
+  hlTxtSelectedRescanBaseline = null;
   _hlRebuildDetected();
   hlAutoSaveScan();
   renderHlPalette();
@@ -7700,7 +9502,7 @@ function exitEditMode() {
   hlEditPainting = false;
   hlEditHoverCell = null;
   document.getElementById('hlEditControls').style.display = 'none';
-  document.getElementById('hlHint').textContent = '滚轮缩放·空格+左键平移·拖角点调整网格';
+  document.getElementById('hlHint').textContent = '滚轮上下移动·Cmd/Ctrl+滚轮缩放·Shift+滚轮横移·空格+左键平移·拖角点调整网格';
   renderHlPalette();
   drawHlCanvas();
   // Auto-save after editing
@@ -7728,6 +9530,7 @@ function hlEditColorInputChange(val, commit) {
 }
 function _hlApplyCell(r, c, code) {
   if (!hlColorMap) return;
+  hlTxtSelectedRescanBaseline = null;
   hlColorMap[r][c] = code;
   drawHlCanvas();
 }
@@ -7746,6 +9549,8 @@ function _hlRebuildDetected() {
 function renderAnalyzeResults() {
   const resultEl = document.getElementById('analyzeResult');
   const totalEl = document.getElementById('analyzeTotal');
+  const sortEl = document.getElementById('analyzeSortMode');
+  if (sortEl && sortEl.value !== analyzeSortMode) sortEl.value = analyzeSortMode;
   if (!analyzeResults || analyzeResults.length === 0) {
     resultEl.innerHTML = '<div class="text-sm text-muted" style="padding:20px;text-align:center">框选区域后点击「开始识别」</div>';
     totalEl.textContent = '';
@@ -7804,10 +9609,16 @@ function addAnalyzeRow() {
 }
 
 function openAnalyzeBatchAdd() {
+  const panel = document.getElementById('analyzeBatchPanel');
   const ta = document.getElementById('analyzeBatchText');
+  if (panel) panel.classList.add('show');
   if (ta) ta.value = '';
-  openModal('modalAnalyzeBatchAdd');
   requestAnimationFrame(() => { if (ta) ta.focus(); });
+}
+
+function closeAnalyzeBatchAdd() {
+  const panel = document.getElementById('analyzeBatchPanel');
+  if (panel) panel.classList.remove('show');
 }
 
 function applyAnalyzeBatchAdd() {
@@ -7839,9 +9650,9 @@ function applyAnalyzeBatchAdd() {
       added++;
     }
   }
-  analyzeResults.sort(_codeSort);
+  sortAnalyzeResults();
   renderAnalyzeResults();
-  closeModal('modalAnalyzeBatchAdd');
+  closeAnalyzeBatchAdd();
   toast(`已添加 ${added}，更新 ${updated}，跳过 ${bad}`, (added || updated) ? 'success' : 'warn');
 }
 
@@ -8205,7 +10016,10 @@ function compressImageData(dataUrl, maxSize) {
       const c = document.createElement('canvas');
       c.width = Math.round(img.width * scale);
       c.height = Math.round(img.height * scale);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      const ctx = c.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, c.width, c.height);
       resolve(c.toDataURL('image/png'));
     };
     img.src = dataUrl;
@@ -8498,9 +10312,12 @@ repairLocalStorageArrayKey(DB.KEY_COLORS, '色号');
 repairLocalStorageArrayKey(DB.KEY_DRAWINGS, '图纸');
 updateOCREngineLabel();
 initDefaultColors();
-document.getElementById('page-colors').classList.add('active');
-renderColorsGrid();
-updateColorsTopbar();
+{
+  const sp = new URLSearchParams(location.search || '');
+  const p = (sp.get('page') || '').trim();
+  const name = (p && PAGE_TITLES[p]) ? p : 'colors';
+  goPage(name);
+}
 </script>
 </body>
 </html>
