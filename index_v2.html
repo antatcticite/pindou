@@ -1503,16 +1503,122 @@ const IDB = (() => {
   };
 })();
 
+function _packScanRowRle(values) {
+  const arr = Array.isArray(values) ? values : [];
+  const out = [];
+  let prev = arr.length ? String(arr[0] || '0') : '0';
+  let n = 0;
+  const push = () => {
+    if (!n) return;
+    out.push(n > 1 ? `${prev}*${n.toString(36)}` : prev);
+  };
+  for (const v of arr) {
+    const s = String(v || '0');
+    if (s === prev) n++;
+    else { push(); prev = s; n = 1; }
+  }
+  push();
+  return out.join(',');
+}
+
+function _unpackScanRowRle(s, decode, cols) {
+  const out = [];
+  for (const part of String(s || '').split(',')) {
+    if (!part) continue;
+    const p = part.split('*');
+    const token = p[0] || '0';
+    const n = Math.max(1, parseInt(p[1] || '1', 36) || 1);
+    const val = decode(token);
+    for (let i = 0; i < n; i++) out.push(val);
+  }
+  while (cols && out.length < cols) out.push(decode('0'));
+  return cols ? out.slice(0, cols) : out;
+}
+
+function _packHlScan(scan) {
+  if (!scan || typeof scan !== 'object') return scan;
+  if (scan.packed === 'rle1' || scan._packed === 'rle1') return scan;
+  const colorMap = scan.colorMap;
+  if (!Array.isArray(colorMap) || !colorMap.length) return scan;
+  const rows = scan.grid && scan.grid.rows ? scan.grid.rows : colorMap.length;
+  const cols = scan.grid && scan.grid.cols ? scan.grid.cols : (Array.isArray(colorMap[0]) ? colorMap[0].length : 0);
+  const codeToIdx = new Map();
+  const codes = [];
+  const encCode = code => {
+    const c = code ? _hlNormBeadCode(String(code).toUpperCase()) : '';
+    if (!c) return '0';
+    if (!codeToIdx.has(c)) { codeToIdx.set(c, codes.length + 1); codes.push(c); }
+    return codeToIdx.get(c).toString(36);
+  };
+  const packedRows = [];
+  for (let r = 0; r < rows; r++) {
+    const row = Array.isArray(colorMap[r]) ? colorMap[r] : [];
+    const vals = [];
+    for (let c = 0; c < cols; c++) vals.push(encCode(row[c]));
+    packedRows.push(_packScanRowRle(vals));
+  }
+  let ignoreRows = null;
+  if (Array.isArray(scan.ignoreMap)) {
+    ignoreRows = [];
+    for (let r = 0; r < rows; r++) {
+      const row = Array.isArray(scan.ignoreMap[r]) ? scan.ignoreMap[r] : [];
+      const vals = [];
+      for (let c = 0; c < cols; c++) vals.push(row[c] ? '1' : '0');
+      ignoreRows.push(_packScanRowRle(vals));
+    }
+  }
+  const { colorMap: _cm, ignoreMap: _ig, ...rest } = scan;
+  return { ...rest, packed: 'rle1', codes, rows: packedRows, ignoreRows };
+}
+
+function _unpackHlScan(scan) {
+  if (!scan || typeof scan !== 'object') return scan;
+  if (!(scan.packed === 'rle1' || scan._packed === 'rle1')) return scan;
+  const codes = Array.isArray(scan.codes) ? scan.codes : [];
+  const packedRows = Array.isArray(scan.rows) ? scan.rows : [];
+  const rowCount = scan.grid && scan.grid.rows ? scan.grid.rows : packedRows.length;
+  const colCount = scan.grid && scan.grid.cols ? scan.grid.cols : 0;
+  const decCode = token => {
+    const idx = parseInt(token || '0', 36) || 0;
+    return idx > 0 ? (codes[idx - 1] || null) : null;
+  };
+  const colorMap = [];
+  for (let r = 0; r < rowCount; r++) colorMap.push(_unpackScanRowRle(packedRows[r] || '', decCode, colCount));
+  let ignoreMap = null;
+  if (Array.isArray(scan.ignoreRows)) {
+    ignoreMap = [];
+    const decBool = token => ((parseInt(token || '0', 36) || 0) > 0);
+    for (let r = 0; r < rowCount; r++) ignoreMap.push(_unpackScanRowRle(scan.ignoreRows[r] || '', decBool, colCount));
+  }
+  const { packed, _packed, codes: _codes, rows: _rows, ignoreRows: _ignoreRows, ...rest } = scan;
+  return { ...rest, colorMap, ignoreMap };
+}
+
+function _packDrawingForStorage(d) {
+  if (!d || typeof d !== 'object') return d;
+  const { image, thumbnail, ...rest } = d;
+  if (rest.hlScan) rest.hlScan = _packHlScan(rest.hlScan);
+  return rest;
+}
+
+function _unpackDrawingFromStorage(d) {
+  if (!d || typeof d !== 'object') return d;
+  const out = { ...d };
+  if (out.hlScan) out.hlScan = _unpackHlScan(out.hlScan);
+  return out;
+}
+
 const DB = {
   KEY_COLORS: 'pdgj_colors',
   KEY_DRAWINGS: 'pdgj_drawings',
 
   getColors() { try { return JSON.parse(localStorage.getItem(this.KEY_COLORS)) || []; } catch { return []; } },
   saveColors(d) { localStorage.setItem(this.KEY_COLORS, JSON.stringify(d)); },
-  getDrawings() { try { return JSON.parse(localStorage.getItem(this.KEY_DRAWINGS)) || []; } catch { return []; } },
+  getDrawings() { try { return (JSON.parse(localStorage.getItem(this.KEY_DRAWINGS)) || []).map(_unpackDrawingFromStorage); } catch { return []; } },
   saveDrawings(d) {
-    // Strip image/thumbnail fields before saving to localStorage
-    const stripped = d.map(({ image, thumbnail, ...rest }) => rest);
+    // Strip image/thumbnail fields before saving to localStorage, and compact
+    // scan matrices so mobile browsers can import lightweight backups.
+    const stripped = d.map(_packDrawingForStorage);
     localStorage.setItem(this.KEY_DRAWINGS, JSON.stringify(stripped));
   },
 
@@ -7812,7 +7918,7 @@ function stripDrawingHeavyBackupFields(drawings, opts = {}) {
     delete rest.hlOutDataUrl;
     delete rest.originalImage;
     if (opts.stripScan) delete rest.hlScan;
-    return rest;
+    return _packDrawingForStorage(rest);
   });
 }
 
@@ -7859,7 +7965,8 @@ async function buildLitePreviewImages(drawings, opts = {}) {
 
 function saveImportedDrawingsWithQuotaFallback(drawings) {
   try {
-    localStorage.setItem(DB.KEY_DRAWINGS, JSON.stringify(drawings || []));
+    const packed = (Array.isArray(drawings) ? drawings : []).map(_packDrawingForStorage);
+    localStorage.setItem(DB.KEY_DRAWINGS, JSON.stringify(packed));
     return { scanStripped: false, previewImages: {} };
   } catch (e) {
     if (!(IDB.isQuotaError && IDB.isQuotaError(e))) throw e;
