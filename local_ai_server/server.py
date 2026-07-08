@@ -1187,9 +1187,22 @@ def _data_url_to_b64(data_url: str) -> str:
     return s
 
 
-def _glm_config() -> Tuple[str, str, str, Optional[str]]:
+def _normalize_glm_model(model: str) -> str:
+    name = (model or "").strip()
+    aliases = {
+        "4v": "glm-4v-flash",
+        "glm-4v": "glm-4v-flash",
+        "glm-4v-flash": "glm-4v-flash",
+        "4.6v": "glm-4.6v-flash",
+        "glm-4.6v": "glm-4.6v-flash",
+        "glm-4.6v-flash": "glm-4.6v-flash",
+    }
+    return aliases.get(name.lower(), name or "glm-4v-flash")
+
+
+def _glm_config(model_override: Optional[str] = None) -> Tuple[str, str, str, Optional[str]]:
     base_url = (os.environ.get("PINDOU_GLM_BASE_URL") or "https://open.bigmodel.cn/api/paas/v4").rstrip("/")
-    model = (os.environ.get("PINDOU_GLM_MODEL") or "glm-4v-flash").strip()
+    model = _normalize_glm_model(model_override or os.environ.get("PINDOU_GLM_MODEL") or "glm-4v-flash")
     api_key = (os.environ.get("PINDOU_GLM_API_KEY") or "").strip()
     if not api_key:
         return base_url, model, api_key, "GLM API Key 未配置。请在 local_ai_server/vlm.env 设置 PINDOU_GLM_API_KEY 后重启本地识别服务。"
@@ -1198,7 +1211,7 @@ def _glm_config() -> Tuple[str, str, str, Optional[str]]:
 
 def _vlm_max_tokens(model: str, default: int = 4096) -> int:
     name = (model or "").lower()
-    if "glm-4v" in name:
+    if "glm-4v" in name or "glm-4.6v" in name:
         return min(default, 1024)
     return default
 
@@ -1486,13 +1499,10 @@ def _coerce_vlm_cell_batch(data: Any, count: int, allowed: Optional[Set[str]]) -
             continue
         if idx < 0 or idx >= count:
             continue
-        raw = _norm_code(str(row.get("code") or row.get("色号") or ""))
-        if not raw:
-            continue
+        raw_text = str(row.get("code") if row.get("code") is not None else row.get("色号") if row.get("色号") is not None else "")
+        raw = _norm_code(raw_text)
         code = raw
-        if allowed and code not in allowed:
-            continue
-        if not code:
+        if code and allowed and code not in allowed:
             continue
         try:
             conf = float(row.get("confidence", row.get("conf", 0.9)))
@@ -1790,14 +1800,15 @@ class Handler(BaseHTTPRequestHandler):
                 return _json_response(self, 400, {"error": err})
             valid = body.get("validCodes") or None
             allowed = set([_norm_code(x) for x in valid]) if isinstance(valid, list) else None
-            base_url, model, api_key, cfg_err = _glm_config()
+            model_override = body.get("glmModel") or body.get("model") or None
+            base_url, model, api_key, cfg_err = _glm_config(str(model_override) if model_override else None)
             if cfg_err:
                 return _json_response(self, 500, {"error": cfg_err})
             t0 = time.time()
             items, e = _run_vlm_legend(data_url, allowed, base_url=base_url, model=model, api_key=api_key)
             if e:
                 return _json_response(self, 500, {"error": e})
-            return _json_response(self, 200, {"source": "glm", "items": items or [], "elapsedMs": int((time.time() - t0) * 1000)})
+            return _json_response(self, 200, {"source": "glm", "model": model, "items": items or [], "elapsedMs": int((time.time() - t0) * 1000)})
 
         if p == "/grid":
             img, err = _decode_data_url(body.get("image") or "")
@@ -1924,14 +1935,15 @@ class Handler(BaseHTTPRequestHandler):
                 return _json_response(self, 400, {"error": "invalid count"})
             allowed_raw = body.get("allowedCodes") or None
             allowed = set([_norm_code(x) for x in allowed_raw]) if isinstance(allowed_raw, list) else None
-            base_url, model, api_key, cfg_err = _glm_config()
+            model_override = body.get("glmModel") or body.get("model") or None
+            base_url, model, api_key, cfg_err = _glm_config(str(model_override) if model_override else None)
             if cfg_err:
                 return _json_response(self, 500, {"error": cfg_err})
             t0 = time.time()
             cells, e = _run_vlm_cell_batch(data_url, count, allowed, base_url=base_url, model=model, api_key=api_key)
             if e:
                 return _json_response(self, 500, {"error": e})
-            return _json_response(self, 200, {"cells": cells or [], "mode": "cells-glm", "filled": len(cells or []), "elapsedMs": int((time.time() - t0) * 1000)})
+            return _json_response(self, 200, {"cells": cells or [], "mode": "cells-glm", "model": model, "filled": len(cells or []), "elapsedMs": int((time.time() - t0) * 1000)})
 
         return _json_response(self, 404, {"error": "not found"})
 

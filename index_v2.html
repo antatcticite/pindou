@@ -1117,6 +1117,10 @@ input[type=color]{width:34px;height:34px;padding:2px;border:1px solid var(--bord
             <div class="font-bold text-sm">识别结果 <span style="font-size:11px;color:var(--muted);font-weight:400">（可多次框选累加，点击数量可修改）</span></div>
             <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
               <button class="btn btn-xs btn-primary" id="ocrControls" onclick="localLegendAnalyze()" title="本地 OCR 识别图例">识别</button>
+              <select id="glmModelSelectAnalyze" class="form-control" onchange="setGlmModelChoice(this.value)" title="GLM模型：默认4V；4.6V通常更强，但高峰期可能更拥挤" style="width:auto;height:28px;font-size:12px;padding:2px 8px">
+                <option value="glm-4v-flash">GLM-4V</option>
+                <option value="glm-4.6v-flash">GLM-4.6V</option>
+              </select>
               <button class="btn btn-xs btn-outline" onclick="glmLegendAnalyze()" title="智谱 GLM 视觉模型识别图例">GLM</button>
               <button class="btn btn-xs btn-outline" onclick="openAnalyzeBatchAdd()">＋ 批量添加</button>
               <button class="btn btn-xs btn-outline" onclick="clearAnalyzeResult()">清空</button>
@@ -1171,7 +1175,6 @@ input[type=color]{width:34px;height:34px;padding:2px;border:1px solid var(--bord
           <span class="text-sm text-muted">行：</span>
           <input id="hlRows" type="number" min="1" value="40" class="form-control" style="width:65px" oninput="drawHlCanvas()">
           <button class="btn btn-sm btn-primary" onclick="doHighlightScan()">🔍 OCR扫描</button>
-          <button class="btn btn-sm btn-outline" onclick="doHighlightGlmScan()" title="使用 GLM-4.6V-Flash 补充/纠正候选格，不覆盖已匹配稳定的结果">GLM识别</button>
           <span class="text-xs text-muted" style="margin-left:2px">增强：</span>
           <select id="hlEnhanceSelect" class="form-control" onchange="hlEnhanceMode=this.value" title="图像预处理：对模糊或对比度低的图纸有帮助" style="font-size:12px;padding:2px 6px;height:auto;width:auto">
             <option value="original">原图</option>
@@ -1321,6 +1324,11 @@ input[type=color]{width:34px;height:34px;padding:2px;border:1px solid var(--bord
           <button class="btn btn-xs btn-outline" onclick="hlTxtRescan(event)" title="只补未分配（空白）">文字重扫</button>
           <button class="btn btn-xs btn-outline" onclick="hlTxtRescanSelected(event)" title="只重扫选中格（会改写选中格的色号）">重扫选中</button>
           <button class="btn btn-xs btn-outline" onclick="hlTxtUndoRescan()">撤销重扫</button>
+          <select id="glmModelSelectRefine" class="form-control" onchange="setGlmModelChoice(this.value)" title="GLM模型：默认4V；4.6V通常更强，但高峰期可能更拥挤" style="font-size:12px;padding:2px 6px;height:28px;width:auto;min-height:28px">
+            <option value="glm-4v-flash">GLM-4V</option>
+            <option value="glm-4.6v-flash">GLM-4.6V</option>
+          </select>
+          <button class="btn btn-xs btn-outline" onclick="hlRefineGlmReviewSelected()" title="只让 GLM 复核当前选中的疑难格，并写回返回的色号">GLM复核选中</button>
           <button class="btn btn-xs btn-outline" onclick="hlRefineExportSelected()" title="导出选中格的原图截图（便于人工核对/发给我识别）">导出选中图</button>
           <span id="hlTxtStat" class="text-xs text-muted"></span>
         </div>
@@ -2645,9 +2653,26 @@ function hlBuildPreviewFromScan(scan) {
 }
 
 function startHlWizard(drawingId) {
+  const d = DB.getDrawing(drawingId);
+  if (!d) return;
+  const canPreviewOnly = (d.status === 'generated' || d.status === 'completed') && d.hlScan && d.hlScan.colorMap;
+  if (canPreviewOnly) {
+    DB.getDrawingImage(drawingId).then(src => {
+      if (!src) {
+        openHlPreviewFromDetail(drawingId);
+        toast('轻量备份未包含原图，已打开高亮预览模式', 'warn');
+        return;
+      }
+      hlWizard.active = true;
+      hlWizard.drawingId = drawingId;
+      const hasReqs = d && d.colorRequirements && d.colorRequirements.length;
+      hlWizard.step = hasReqs ? 2 : 1;
+      hlWizardGo();
+    });
+    return;
+  }
   hlWizard.active = true;
   hlWizard.drawingId = drawingId;
-  const d = DB.getDrawing(drawingId);
   const hasReqs = d && d.colorRequirements && d.colorRequirements.length;
   hlWizard.step = hasReqs ? 2 : 1;
   hlWizardGo();
@@ -3252,6 +3277,23 @@ function updateOCREngineLabel() {
 }
 
 const LOCAL_MODEL_BASE_URL = 'http://127.0.0.1:5055';
+const GLM_MODEL_STORAGE_KEY = 'pdgj_glm_model';
+const GLM_MODEL_OPTIONS = new Set(['glm-4v-flash', 'glm-4.6v-flash']);
+function getGlmModelChoice() {
+  let v = '';
+  try { v = localStorage.getItem(GLM_MODEL_STORAGE_KEY) || ''; } catch (e) {}
+  return GLM_MODEL_OPTIONS.has(v) ? v : 'glm-4v-flash';
+}
+function setGlmModelChoice(value) {
+  const v = GLM_MODEL_OPTIONS.has(value) ? value : 'glm-4v-flash';
+  try { localStorage.setItem(GLM_MODEL_STORAGE_KEY, v); } catch (e) {}
+  document.querySelectorAll('#glmModelSelectAnalyze,#glmModelSelectHighlight,#glmModelSelectRefine').forEach(el => {
+    if (el && el.value !== v) el.value = v;
+  });
+}
+function initGlmModelChoice() {
+  setGlmModelChoice(getGlmModelChoice());
+}
 async function _localModelFetchJson(path, payload, timeoutMs = 25000) {
   const base = LOCAL_MODEL_BASE_URL;
   const url = base + path;
@@ -3334,7 +3376,12 @@ async function runLegendAnalyzeWithEndpoint(opts) {
     const validColors = allDBColors
       .filter(c => validCodes.includes(c.code.toUpperCase()))
       .map(c => ({ code: c.code.toUpperCase(), hex: c.hex }));
-    const d = await _localModelFetchJson(opts.path || '/legend', { image: img, validCodes, validColors }, opts.timeoutMs || 120000);
+    const d = await _localModelFetchJson(opts.path || '/legend', {
+      image: img,
+      validCodes,
+      validColors,
+      glmModel: getGlmModelChoice()
+    }, opts.timeoutMs || 120000);
     const items0 = Array.isArray(d) ? d : (Array.isArray(d.items) ? d.items : []);
     const merged = {};
     for (const it of items0) {
@@ -5400,18 +5447,29 @@ function openHlModal(drawingId) {
   hlAiLastScan = null;
 
   DB.getDrawingImage(drawingId).then(src => {
+    const saved = d.hlScan;
+    let rebuiltPack = null;
+    if (!src && saved && saved.colorMap) {
+      rebuiltPack = hlBuildPreviewPackFromScan(saved, {
+        maxDim: 2200,
+        maxCell: 22,
+        pad: 10,
+        showGrid: false,
+        showCodes: false
+      });
+      if (rebuiltPack && rebuiltPack.url) src = rebuiltPack.url;
+    }
     if (!src) { toast('此图纸未上传图片', 'warn'); return; }
     const img = new Image();
     img.onload = () => {
       hlImg = img;
       // Restore saved scan if available
-      const saved = d.hlScan;
       if (saved && saved.colorMap) {
         hlColorMap = saved.colorMap;
         hlIgnoreMap = saved.ignoreMap || null;
-        hlGrid = { ...saved.grid };
-        document.getElementById('hlCols').value = saved.grid.cols;
-        document.getElementById('hlRows').value = saved.grid.rows;
+        hlGrid = rebuiltPack && rebuiltPack.grid ? { ...rebuiltPack.grid } : { ...saved.grid };
+        document.getElementById('hlCols').value = hlGrid.cols;
+        document.getElementById('hlRows').value = hlGrid.rows;
         const ac = DB.getColors();
         const cm = {};
         hlColorMap.forEach((row, r) => row.forEach((c, cc) => { if (c && !(hlIgnoreMap && hlIgnoreMap[r] && hlIgnoreMap[r][cc])) cm[c] = (cm[c]||0)+1; }));
@@ -5429,7 +5487,9 @@ function openHlModal(drawingId) {
         if (d.hlScan) {
           renderHlPalette();
           drawHlCanvas();
-          document.getElementById('hlHint').textContent = '已加载上次识别结果，点击色号高亮对应位置';
+          document.getElementById('hlHint').textContent = rebuiltPack
+            ? '轻量备份未包含原图，已用识别结果重建预览'
+            : '已加载上次识别结果，点击色号高亮对应位置';
         }
       });
     };
@@ -7133,7 +7193,8 @@ async function doHighlightGlmScan() {
       const data = await _localModelFetchJson('/cells-glm', {
         image: sheet.toDataURL('image/png'),
         count: block.rows * block.cols,
-        allowedCodes: codes
+        allowedCodes: codes,
+        glmModel: getGlmModelChoice()
       }, 240000);
       const cells = Array.isArray(data && data.cells) ? data.cells : [];
       for (const cell of cells) {
@@ -7742,7 +7803,20 @@ async function exportAllData() {
   }
 }
 
-function stripDrawingHeavyBackupFields(drawings) {
+function stripDrawingHeavyBackupFields(drawings, opts = {}) {
+  return (Array.isArray(drawings) ? drawings : []).map(d => {
+    if (!d || typeof d !== 'object') return d;
+    const rest = { ...d };
+    delete rest.image;
+    delete rest.thumbnail;
+    delete rest.hlOutDataUrl;
+    delete rest.originalImage;
+    if (opts.stripScan) delete rest.hlScan;
+    return rest;
+  });
+}
+
+function stripDrawingStorageFallbackFields(drawings) {
   return (Array.isArray(drawings) ? drawings : []).map(d => {
     if (!d || typeof d !== 'object') return d;
     const {
@@ -7806,7 +7880,7 @@ function saveImportedDrawingsWithQuotaFallback(drawings) {
         if (pack && pack.url) previewImages['thumb_' + d.id] = pack.url;
       }
     }
-    const stripped = stripDrawingHeavyBackupFields(drawings);
+    const stripped = stripDrawingStorageFallbackFields(drawings);
     localStorage.setItem(DB.KEY_DRAWINGS, JSON.stringify(stripped));
     return { scanStripped: true, previewImages };
   }
@@ -7820,17 +7894,15 @@ async function exportAllDataLite() {
   try {
     const colors = DB.getColors();
     const fullDrawings = DB.getDrawings();
-    btn.textContent = '生成预览…';
-    const images = await buildLitePreviewImages(fullDrawings);
     const drawings = stripDrawingHeavyBackupFields(fullDrawings);
     const payload = {
-      version: 3,
+      version: 4,
       lite: true,
       mobileLite: true,
       exportedAt: new Date().toISOString(),
       colors,
       drawings,
-      images
+      images: {}
     };
     const blob = new Blob([JSON.stringify(payload)], { type: 'application/json;charset=utf-8' });
     const a = document.createElement('a');
@@ -7839,7 +7911,7 @@ async function exportAllDataLite() {
     a.download = `拼豆管家轻量备份_${date}.json`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(a.href);
-    toast(`轻量备份成功：${colors.length} 个色号，${drawings.length} 个图纸，${Object.keys(images).length} 张手机预览图`, 'success');
+    toast(`轻量备份成功：${colors.length} 个色号，${drawings.length} 个图纸，不包含图片`, 'success');
   } catch(e) {
     toast('导出失败：' + e.message, 'warn');
   } finally {
@@ -9247,6 +9319,102 @@ function hlRefineBuildSelectedSheet(maxCells = 36) {
   return { image: cv.toDataURL('image/jpeg', 0.9), cells: list, clipped: ids.length > list.length };
 }
 
+function _hlRefineAllowedCodesFromRequirements() {
+  const d = hlDrawingId ? DB.getDrawing(hlDrawingId) : null;
+  const reqs = d && d.colorRequirements && d.colorRequirements.length ? d.colorRequirements : null;
+  const allColors = DB.getColors();
+  if (reqs) {
+    const ids = new Set(reqs.map(r => r.colorId));
+    const codes = allColors
+      .filter(c => ids.has(c.id))
+      .map(c => (c.code || '').toUpperCase())
+      .filter(Boolean);
+    if (codes.length) return Array.from(new Set(codes.map(_hlNormBeadCode)));
+  }
+  return allColors.map(c => (c.code || '').toUpperCase()).filter(Boolean);
+}
+
+async function hlRefineGlmReviewSelected() {
+  if (!hlRefineState.open) { toast('请先进入 Step3 微调界面', 'warn'); return; }
+  if (!hlRefineState.selected || !hlRefineState.selected.size) {
+    toast('请先选中要让 GLM 复核的疑难格', 'warn');
+    return;
+  }
+  if (!hlColorMap || !hlGrid || !hlImg) { toast('缺少图纸数据', 'warn'); return; }
+  let pack = null;
+  try {
+    pack = hlRefineBuildSelectedSheet(48);
+  } catch (e) {
+    toast(e && e.message ? e.message : '选中格打包失败', 'warn');
+    return;
+  }
+  const allowedCodes = _hlRefineAllowedCodesFromRequirements();
+  if (!allowedCodes.length) { toast('没有可用色号需求，无法 GLM 复核', 'warn'); return; }
+  const statEl = document.getElementById('hlTxtStat');
+  const oldStat = statEl ? statEl.textContent : '';
+  if (statEl) statEl.textContent = `GLM复核中…${pack.cells.length} 格`;
+  try {
+    const data = await _localModelFetchJson('/cells-glm', {
+      image: pack.image,
+      count: pack.cells.length,
+      allowedCodes,
+      glmModel: getGlmModelChoice()
+    }, 240000);
+    const results = Array.isArray(data && data.cells) ? data.cells : [];
+    if (!results.length) {
+      toast('GLM 没有返回可用色号，选中格未改变', 'warn');
+      return;
+    }
+    const allowedSet = new Set(allowedCodes.map(c => _hlNormBeadCode(String(c).toUpperCase())));
+    let updated = 0;
+    let cleared = 0;
+    const before = _hlCloneColorMap(hlColorMap);
+    if (!hlIgnoreMap || hlIgnoreMap.length !== hlGrid.rows || (hlIgnoreMap[0] && hlIgnoreMap[0].length !== hlGrid.cols)) {
+      hlIgnoreMap = Array.from({ length: hlGrid.rows }, () => Array(hlGrid.cols).fill(false));
+    }
+    for (const item of results) {
+      const idx = parseInt(item && item.i, 10);
+      if (!Number.isFinite(idx) || idx < 0 || idx >= pack.cells.length) continue;
+      const cell = pack.cells[idx];
+      if (!cell) continue;
+      const raw = String(item.code || '').trim().toUpperCase();
+      const code = raw ? _hlNormBeadCode(raw) : '';
+      if (code && !allowedSet.has(code)) continue;
+      const cur = hlColorMap[cell.r] && hlColorMap[cell.r][cell.c] ? String(hlColorMap[cell.r][cell.c]).toUpperCase() : '';
+      if (!code) {
+        if (cur) {
+          hlColorMap[cell.r][cell.c] = null;
+          hlIgnoreMap[cell.r][cell.c] = false;
+          updated++;
+          cleared++;
+        }
+        continue;
+      }
+      if (cur !== code) {
+        hlColorMap[cell.r][cell.c] = code;
+        hlIgnoreMap[cell.r][cell.c] = false;
+        updated++;
+      }
+    }
+    if (updated) {
+      hlTxtLastColorMap = before;
+      _hlRebuildDetected();
+      hlAutoSaveScan();
+      renderHlPalette();
+      drawHlCanvas();
+      hlRefineRenderGroups();
+      hlRefineRender();
+      hlRefineMaybeToastAllMatched();
+    }
+    const clippedText = pack.clipped ? '（选中较多，本次仅复核前48格）' : '';
+    toast(`GLM复核完成：返回 ${results.length} 格，更新 ${updated}${cleared ? `，清空 ${cleared}` : ''}${clippedText}`, updated ? 'success' : 'warn');
+  } catch (e) {
+    toast(`GLM复核失败：${e && e.message ? e.message : e}`, 'warn');
+  } finally {
+    if (statEl) statEl.textContent = oldStat || '';
+  }
+}
+
 function hlRefineAssign() {
   const input = document.getElementById('hlRefineAssignInput');
   const raw = (input && input.value ? input.value.trim().toUpperCase() : '');
@@ -10311,6 +10479,7 @@ if (!localStorage.getItem(BAIDU_STORAGE_KEY)) {
 repairLocalStorageArrayKey(DB.KEY_COLORS, '色号');
 repairLocalStorageArrayKey(DB.KEY_DRAWINGS, '图纸');
 updateOCREngineLabel();
+initGlmModelChoice();
 initDefaultColors();
 {
   const sp = new URLSearchParams(location.search || '');
